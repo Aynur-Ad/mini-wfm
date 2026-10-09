@@ -1,0 +1,17 @@
+# Bağımlılıklar (Klasörlerin git'e gitmesini engeller)
+node_modules/
+**/node_modules/
+
+# Derleme Çıktıları
+dist/
+**/dist/
+
+# Log Dosyaları
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# İşletim Sistemi Dosyaları
+.DS_Store
+Thumbs.db
