@@ -50,3 +50,14 @@ pnpm install
 
 ---
 
+### Veritabanını Başlatma
+Projeyi ayağa kaldırmadan önce PostgreSQL container'ını başlatın:
+\`\`\`bash
+docker compose up -d
+\`\`\`
+Durdurmak için:
+\`\`\`bash
+docker compose down
+\`\`\`
+
+---
