@@ -1,3 +1,6 @@
+# Ortam Değişkenleri
+.env
+
 # Bağımlılıklar (Klasörlerin git'e gitmesini engeller)
 node_modules/
 **/node_modules/

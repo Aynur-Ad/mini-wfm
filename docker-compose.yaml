@@ -1,4 +1,6 @@
-services:
+# çalışacak uygulamaları belirttiğimiz kısım: services
+
+services:  
   postgres:
     image: postgres:16-alpine
     container_name: mini_wfm_postgres

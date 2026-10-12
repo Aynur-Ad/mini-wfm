@@ -33,6 +33,7 @@ pnpm install
 ```
 
 ### 2. Projelerin Geliştirme (Development) Modunda Başlatılması
+
 İki proje aynı anda çalışacağı için iki ayrı terminal sekmesi açarak aşağıdaki komutları yürütün:
 
 * **Terminal 1 (API Servisi - Port 3000):**
@@ -51,13 +52,17 @@ pnpm install
 ---
 
 ### Veritabanını Başlatma
+
 Projeyi ayağa kaldırmadan önce PostgreSQL container'ını başlatın:
-\`\`\`bash
+
+```bash
 docker compose up -d
-\`\`\`
+```
+
 Durdurmak için:
-\`\`\`bash
+
+```bash
 docker compose down
-\`\`\`
+```
 
 ---
