@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core'; // nestjs çekirdek kütüphanesinden nestfactory sınıfını içe aktarır. Bu sınıf yeni bir nestjs uygulama instance oluşturmak için kullanılan bir fabrika sınıfı(factory pattern).
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { GlobalExceptionFilter } from './common/filters/global-exception.filter.js';
 import { AppModule } from './app.module.js'; // projenin ana modülünü içe aktarır.
 
 async function bootstrap() {
@@ -28,6 +29,9 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('docs', app, document);
 
+  // Global Exception Filter kaydı
+  app.useGlobalFilters(new GlobalExceptionFilter());
+  
   // uygulamadan gelen ağ isteklerini hangi port üzerinden dinleyeceğini belirler ve dinlemeyi başlatır.
   const port = process.env.PORT || 3000;
   await app.listen(port);
