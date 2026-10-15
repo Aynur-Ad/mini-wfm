@@ -8,6 +8,7 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import {
@@ -22,6 +23,7 @@ import {
 } from '@nestjs/swagger';
 import { Observable } from 'rxjs';
 import { CreateTeamDto } from './dto/create-team.dto.js';
+import { QueryTeamsDto } from './dto/query-teams.dto.js';
 import { UpdateTeamDto } from './dto/update-team.dto.js';
 
 @ApiTags('Teams')
@@ -40,6 +42,18 @@ export class TeamsController {
   @ApiConflictResponse({ description: 'Bu isimde bir ekip zaten var' })
   create(@Body() createTeamDto: CreateTeamDto): Observable<unknown> {
     return this.workforceClient.send('createTeam', createTeamDto);
+  }
+
+  @Get()
+  @ApiOperation({
+    summary: 'Ekipleri sayfalı, aranabilir ve filtrelenebilir şekilde listeler',
+  })
+  @ApiOkResponse({ description: 'Ekip listesi başarıyla getirildi' })
+  @ApiBadRequestResponse({
+    description: 'Geçersiz query parametresi (ör. page < 1 veya limit > 100)',
+  })
+  findAll(@Query() queryTeamsDto: QueryTeamsDto): Observable<unknown> {
+    return this.workforceClient.send('findAllTeams', queryTeamsDto);
   }
 
   @Get(':id')
