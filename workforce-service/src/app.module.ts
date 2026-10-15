@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { dbConfig } from './data-source.js';
 import { AppController } from './app.controller.js';
+import { TeamsModule } from './teams/teams.module.js';
 
 
 @Module({
@@ -12,6 +13,7 @@ import { AppController } from './app.controller.js';
       envFilePath: '.env',
     }),
     TypeOrmModule.forRoot(dbConfig),
+    TeamsModule,
   ],
   controllers: [AppController],
 })
