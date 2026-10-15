@@ -2,6 +2,7 @@ import { Controller } from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 import { TeamsService } from './teams.service.js';
 import { CreateTeamDto } from './dto/create-team.dto.js';
+import { QueryTeamsDto } from './dto/query-teams.dto.js';
 import { UpdateTeamDto } from './dto/update-team.dto.js';
 
 @Controller()
@@ -14,8 +15,8 @@ export class TeamsController {
   }
 
   @MessagePattern('findAllTeams')
-  findAll() {
-    return this.teamsService.findAll();
+  findAll(@Payload() queryTeamsDto: QueryTeamsDto) {
+    return this.teamsService.findAll(queryTeamsDto);
   }
 
   @MessagePattern('findOneTeam')
