@@ -1,7 +1,8 @@
 import { Module } from '@nestjs/common'; // typescript/javascript sınıflarına modül davranışı ve metaverisi kazandırmak için kullanılan module'ü içe aktarır.
-import { ClientsModule, Transport  } from '@nestjs/microservices';
+import { ClientsModule, Transport } from '@nestjs/microservices';
 import { AppController } from './app.controller.js'; // modülün kullanacağı istek karşılayıcıyı projeye dahil eder.
 import { AppService } from './app.service.js'; // modülün kullanacağı iş mantığını barındıran servisi projeye dahil eder.
+import { TeamsController } from './teams/teams.controller.js'; // modülün kullanacağı istek karşılayıcıyı projeye dahil eder.
 
 // sınıfın üzerine gelerek nestjse bu sınıfın hangi parçalardan oluştuğunu tarif eder.
 @Module({
@@ -17,8 +18,8 @@ import { AppService } from './app.service.js'; // modülün kullanacağı iş ma
         },
       },
     ]),
-  ], 
-  controllers: [AppController], // gelen http isteklerini karşılayıp yanıt dönecek denetleyicileri kaydeder.
+  ],
+  controllers: [AppController, TeamsController], // gelen http isteklerini karşılayıp yanıt dönecek denetleyicileri kaydeder.
   providers: [AppService], // nestjsin bağımlılık enjeksiyonu mekanizmasına kaydedilecek sağlayıcıları tanımlar. Mesela burada appservice kaydedildiği için, appcontroller sınıfı constructer üzerinden appservice'i doğrudan talep edip kullanabilir.
 })
 export class AppModule {} // modülün dışa aktarılmasını sağlar.
