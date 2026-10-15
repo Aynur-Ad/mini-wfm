@@ -1,10 +1,12 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Inject,
   Param,
   ParseIntPipe,
+  Patch,
   Post,
 } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
@@ -20,6 +22,7 @@ import {
 } from '@nestjs/swagger';
 import { Observable } from 'rxjs';
 import { CreateTeamDto } from './dto/create-team.dto.js';
+import { UpdateTeamDto } from './dto/update-team.dto.js';
 
 @ApiTags('Teams')
 @Controller('teams') // main.ts'deki setGlobalPrefix('api') sayesinde /api/teams olur
@@ -52,5 +55,39 @@ export class TeamsController {
   @ApiNotFoundResponse({ description: 'Ekip bulunamadı' })
   findOne(@Param('id', ParseIntPipe) id: number): Observable<unknown> {
     return this.workforceClient.send('findOneTeam', id);
+  }
+
+  @Patch(':id')
+  @ApiOperation({ summary: 'Mevcut bir ekibi kısmi olarak günceller' })
+  @ApiParam({
+    name: 'id',
+    type: Number,
+    description: 'Güncellenecek ekibin sayısal ID değeri',
+    example: 1,
+  })
+  @ApiOkResponse({ description: 'Ekip başarıyla güncellendi' })
+  @ApiBadRequestResponse({ description: 'Doğrulama hatası veya geçersiz ID' })
+  @ApiNotFoundResponse({ description: 'Ekip bulunamadı' })
+  @ApiConflictResponse({ description: 'Bu isimde bir ekip zaten var' })
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updateTeamDto: UpdateTeamDto,
+  ): Observable<unknown> {
+    return this.workforceClient.send('updateTeam', { id, ...updateTeamDto });
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'ID bilgisine göre ekibi siler' })
+  @ApiParam({
+    name: 'id',
+    type: Number,
+    description: 'Silinecek ekibin sayısal ID değeri',
+    example: 1,
+  })
+  @ApiOkResponse({ description: 'Ekip başarıyla silindi' })
+  @ApiBadRequestResponse({ description: 'Geçersiz ID formatı (sayı değil)' })
+  @ApiNotFoundResponse({ description: 'Ekip bulunamadı' })
+  remove(@Param('id', ParseIntPipe) id: number): Observable<unknown> {
+    return this.workforceClient.send('removeTeam', id);
   }
 }

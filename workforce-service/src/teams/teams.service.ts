@@ -58,11 +58,47 @@ export class TeamsService {
     return team;
   }
 
-  update(id: number, updateTeamDto: UpdateTeamDto) {
-    return `This action updates a #${id} team`;
+  async update(id: number, updateTeamDto: UpdateTeamDto): Promise<Team> {
+    // 1. Ekip var mı kontrol et (Yoksa findOne metodu 404 RpcException fırlatır)
+    const team = await this.findOne(id);
+
+    // 2. Ad değiştiriliyorsa (name gönderilmiş ve mevcut addan farklıysa)
+    if (updateTeamDto.name !== undefined && updateTeamDto.name !== team.name) {
+      const existingTeam = await this.teamRepository.findOne({
+        where: { name: updateTeamDto.name },
+      });
+
+      // Bu ad başka bir ekipte varsa 409 Conflict fırlat
+      if (existingTeam) {
+        throw new RpcException({
+          statusCode: HttpStatus.CONFLICT, // 409
+          message: 'Bu isimde bir ekip zaten var',
+        });
+      }
+    }
+
+    // 3. Yalnızca gönderilen (undefined olmayan) alanları güncelle
+    if (updateTeamDto.name !== undefined) {
+      team.name = updateTeamDto.name;
+    }
+    if (updateTeamDto.description !== undefined) {
+      team.description = updateTeamDto.description;
+    }
+    if (updateTeamDto.isActive !== undefined) {
+      team.isActive = updateTeamDto.isActive;
+    }
+
+    // 4. Kaydet ve güncel ekibi dön (save metodu updatedAt alanını otomatik günceller)
+    return await this.teamRepository.save(team);
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} team`;
+  async remove(id: number): Promise<{ deleted: boolean; id: number }> {
+    // 1. Ekip var mı kontrol et (Yoksa findOne metodu 404 RpcException fırlatır)
+    const team = await this.findOne(id);
+
+    // 2. Varsa veritabanından sil
+    await this.teamRepository.remove(team);
+
+    return { deleted: true, id };
   }
 }
