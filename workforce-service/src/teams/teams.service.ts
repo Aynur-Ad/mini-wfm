@@ -26,7 +26,7 @@ export class TeamsService {
         statusCode: HttpStatus.CONFLICT, // 409
         message: 'Bu isimde bir ekip zaten var',
       });
-    }
+    } 
 
     // 3. Yoksa ekibi oluştur ve veritabanına kaydet
     const team = this.teamRepository.create({
