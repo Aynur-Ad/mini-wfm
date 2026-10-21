@@ -1,7 +1,18 @@
 // web/src/pages/teams-page.tsx
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Button, Input, Select, Space, Table, Tag, Typography } from "antd";
+import {
+  Button,
+  Input,
+  Popconfirm,
+  Select,
+  Space,
+  Switch,
+  Table,
+  Tag,
+  Typography,
+  message,
+} from "antd";
 import type { TableColumnsType } from "antd";
 import {
   DeleteOutlined,
@@ -11,7 +22,7 @@ import {
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { TeamFormModal } from "../components/team-form-modal";
-import { useTeams } from "../hooks/use-teams";
+import { useDeleteTeam, useTeams, useUpdateTeam } from "../hooks/use-teams";
 import type { Team } from "../types";
 
 const { Title } = Typography;
@@ -25,7 +36,6 @@ export function TeamsPage() {
     "all" | "active" | "passive"
   >("all");
 
-  // Modal açık/kapalı durumu ve düzenlenen ekip state'i
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [editingTeam, setEditingTeam] = useState<Team | null>(null);
 
@@ -48,13 +58,14 @@ export function TeamsPage() {
     isActive: isActiveParam,
   });
 
-  // "Yeni Ekip" butonuna tıklanınca formu boş açar
+  const updateTeamMutation = useUpdateTeam();
+  const deleteTeamMutation = useDeleteTeam();
+
   const handleOpenCreateModal = () => {
     setEditingTeam(null);
     setIsModalOpen(true);
   };
 
-  // Tablodaki "Düzenle" butonuna tıklanınca formu ilgili ekibin verileriyle açar
   const handleOpenEditModal = (team: Team) => {
     setEditingTeam(team);
     setIsModalOpen(true);
@@ -63,6 +74,31 @@ export function TeamsPage() {
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setEditingTeam(null);
+  };
+
+  // Satırdaki Switch ile aktif/pasif durumunu değiştirir
+  const handleToggleStatus = async (team: Team, checked: boolean) => {
+    try {
+      await updateTeamMutation.mutateAsync({
+        id: team.id,
+        payload: { isActive: checked },
+      });
+      message.success(
+        checked ? "Ekip aktif hale getirildi" : "Ekip pasif hale getirildi",
+      );
+    } catch {
+      // Hata mesajı http.ts interceptor tarafından gösterilir
+    }
+  };
+
+  // Popconfirm onaylandığında ekibi siler
+  const handleDeleteTeam = async (id: number) => {
+    try {
+      await deleteTeamMutation.mutateAsync(id);
+      message.success("Ekip başarıyla silindi");
+    } catch {
+      // Hata mesajı http.ts interceptor tarafından gösterilir
+    }
   };
 
   const columns: TableColumnsType<Team> = [
@@ -85,12 +121,28 @@ export function TeamsPage() {
       title: "Durum",
       dataIndex: "isActive",
       key: "isActive",
-      render: (isActive: boolean) =>
-        isActive ? (
-          <Tag color="green">Aktif</Tag>
-        ) : (
-          <Tag color="default">Pasif</Tag>
-        ),
+      render: (isActive: boolean, record: Team) => {
+        // Yalnızca o an güncellenen satırın anahtarı yükleniyor (loading) durumunda olur
+        const isRowToggling =
+          updateTeamMutation.isPending &&
+          updateTeamMutation.variables?.id === record.id;
+
+        return (
+          <Space size="small">
+            <Switch
+              size="small"
+              checked={isActive}
+              loading={isRowToggling}
+              onChange={(checked) => handleToggleStatus(record, checked)}
+            />
+            {isActive ? (
+              <Tag color="green">Aktif</Tag>
+            ) : (
+              <Tag color="default">Pasif</Tag>
+            )}
+          </Space>
+        );
+      },
     },
     {
       title: "Oluşturulma",
@@ -102,20 +154,39 @@ export function TeamsPage() {
     {
       title: "İşlemler",
       key: "actions",
-      render: (_: unknown, record: Team) => (
-        <Space size="small">
-          <Button
-            type="text"
-            icon={<EditOutlined />}
-            onClick={() => handleOpenEditModal(record)}
-          >
-            Düzenle
-          </Button>
-          <Button type="text" danger icon={<DeleteOutlined />}>
-            Sil
-          </Button>
-        </Space>
-      ),
+      render: (_: unknown, record: Team) => {
+        const isRowDeleting =
+          deleteTeamMutation.isPending &&
+          deleteTeamMutation.variables === record.id;
+
+        return (
+          <Space size="small">
+            <Button
+              type="text"
+              icon={<EditOutlined />}
+              onClick={() => handleOpenEditModal(record)}
+            >
+              Düzenle
+            </Button>
+            <Popconfirm
+              title="Ekibi silmek istediğinize emin misiniz?"
+              okText="Sil"
+              cancelText="Vazgeç"
+              okButtonProps={{ danger: true, loading: isRowDeleting }}
+              onConfirm={() => handleDeleteTeam(record.id)}
+            >
+              <Button
+                type="text"
+                danger
+                icon={<DeleteOutlined />}
+                loading={isRowDeleting}
+              >
+                Sil
+              </Button>
+            </Popconfirm>
+          </Space>
+        );
+      },
     },
   ];
 
@@ -188,7 +259,6 @@ export function TeamsPage() {
         }}
       />
 
-      {/* Oluşturma ve Düzenleme Modal Formu */}
       <TeamFormModal
         open={isModalOpen}
         team={editingTeam}
