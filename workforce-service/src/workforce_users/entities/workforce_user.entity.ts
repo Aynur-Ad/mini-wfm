@@ -21,7 +21,7 @@ export class WorkforceUser {
     registrationNumber: string;
 
     @Column ({ type: 'varchar', length: 10, nullable: true })
-    phone: string;
+    phone: string | null;
 
     @Column ({ name: 'is_active', type: 'boolean', default: true })
     isActive: boolean;
@@ -32,4 +32,3 @@ export class WorkforceUser {
     @UpdateDateColumn ({ name: 'updated_at', type: 'timestamptz' })
     updatedAt: Date;
 }
-

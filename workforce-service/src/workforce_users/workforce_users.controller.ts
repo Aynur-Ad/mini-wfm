@@ -2,6 +2,7 @@ import { Controller } from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 import { WorkforceUsersService } from './workforce_users.service.js';
 import { CreateWorkforceUserDto } from './dto/create-workforce_user.dto.js';
+import { QueryWorkforceUsersDto } from './dto/query-workforce_users.dto.js';
 import { UpdateWorkforceUserDto } from './dto/update-workforce_user.dto.js';
 
 @Controller()
@@ -14,8 +15,8 @@ export class WorkforceUsersController {
   }
 
   @MessagePattern('findAllWorkforceUsers')
-  findAll() {
-    return this.workforceUsersService.findAll();
+  findAll(@Payload() queryWorkforceUsersDto: QueryWorkforceUsersDto) {
+    return this.workforceUsersService.findAll(queryWorkforceUsersDto);
   }
 
   @MessagePattern('findOneWorkforceUser')
