@@ -10,6 +10,7 @@ import {
   SearchOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
+import { TeamFormModal } from "../components/team-form-modal";
 import { useTeams } from "../hooks/use-teams";
 import type { Team } from "../types";
 
@@ -24,7 +25,10 @@ export function TeamsPage() {
     "all" | "active" | "passive"
   >("all");
 
-  // Arama kutusu: yazma bittikten 400 ms sonra istek atar ve 1. sayfaya döner
+  // Modal açık/kapalı durumu ve düzenlenen ekip state'i
+  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+  const [editingTeam, setEditingTeam] = useState<Team | null>(null);
+
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(searchInput.trim());
@@ -37,13 +41,29 @@ export function TeamsPage() {
   const isActiveParam =
     statusFilter === "all" ? undefined : statusFilter === "active";
 
-  // P5 Kuralı: Sayfa yalnızca hook kullanır, API dosyasını doğrudan çağırmaz
   const { data, isFetching } = useTeams({
     page,
     limit,
     search: debouncedSearch || undefined,
     isActive: isActiveParam,
   });
+
+  // "Yeni Ekip" butonuna tıklanınca formu boş açar
+  const handleOpenCreateModal = () => {
+    setEditingTeam(null);
+    setIsModalOpen(true);
+  };
+
+  // Tablodaki "Düzenle" butonuna tıklanınca formu ilgili ekibin verileriyle açar
+  const handleOpenEditModal = (team: Team) => {
+    setEditingTeam(team);
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setEditingTeam(null);
+  };
 
   const columns: TableColumnsType<Team> = [
     {
@@ -82,9 +102,13 @@ export function TeamsPage() {
     {
       title: "İşlemler",
       key: "actions",
-      render: () => (
+      render: (_: unknown, record: Team) => (
         <Space size="small">
-          <Button type="text" icon={<EditOutlined />}>
+          <Button
+            type="text"
+            icon={<EditOutlined />}
+            onClick={() => handleOpenEditModal(record)}
+          >
             Düzenle
           </Button>
           <Button type="text" danger icon={<DeleteOutlined />}>
@@ -108,7 +132,11 @@ export function TeamsPage() {
         <Title level={3} style={{ margin: 0 }}>
           Ekipler
         </Title>
-        <Button type="primary" icon={<PlusOutlined />}>
+        <Button
+          type="primary"
+          icon={<PlusOutlined />}
+          onClick={handleOpenCreateModal}
+        >
           Yeni Ekip
         </Button>
       </div>
@@ -158,6 +186,13 @@ export function TeamsPage() {
             }
           },
         }}
+      />
+
+      {/* Oluşturma ve Düzenleme Modal Formu */}
+      <TeamFormModal
+        open={isModalOpen}
+        team={editingTeam}
+        onClose={handleCloseModal}
       />
     </div>
   );
