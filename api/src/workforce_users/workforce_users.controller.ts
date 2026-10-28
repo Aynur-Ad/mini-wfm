@@ -1,7 +1,10 @@
 import {
     Body,
     Controller,
+    Get,
     Inject,
+    Param,
+    ParseIntPipe,
     Post,
 } from "@nestjs/common";
 
@@ -30,7 +33,9 @@ export class WorkforceUsersController {
 
     @Post()
     @ApiOperation({ summary: 'Yeni bir personel oluşturur' })
+
     @ApiCreatedResponse({ description: 'Personel başarıyla oluşturuldu' })
+    
     @ApiBadRequestResponse({ description: 'Doğrulama hatası (firstName boş veya 100 karakterden uzun)' })
     @ApiBadRequestResponse({ description: 'Doğrulama hatası (lastName boş veya 100 karakterden uzun)' })
     @ApiBadRequestResponse({ description: 'Doğrulama hatası (registrationNumber boş veya 20 karakterden uzun)' })
@@ -41,6 +46,21 @@ export class WorkforceUsersController {
     create(@Body() createWorkforceUserDto: CreateWorkforceUserDto): Observable<unknown> {
         return this.workforceClient.send('createWorkforceUser', createWorkforceUserDto);
     }
+
+     @Get(':id')
+      @ApiOperation({ summary: 'ID bilgisine göre personel detayını getirir' })
+      @ApiParam({
+        name: 'id',
+        type: Number,
+        description: 'Personelin sayısal ID değeri',
+        example: 1,
+      })
+      @ApiOkResponse({ description: 'Personel detayı başarıyla getirildi' })
+      @ApiBadRequestResponse({ description: 'Geçersiz ID formatı (sayı değil)' })
+      @ApiNotFoundResponse({ description: 'Personel bulunamadı' })
+      findOne(@Param('id', ParseIntPipe) id: number): Observable<unknown> {
+        return this.workforceClient.send('findOneWorkforceUser', id);
+      }
 }
 
 
