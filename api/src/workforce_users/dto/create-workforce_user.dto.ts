@@ -41,7 +41,7 @@ export class CreateWorkforceUserDto {
   @IsOptional()
   @IsString({ message: 'Telefon numarası metin (string) olmalıdır' })
   @Matches(/^5[0-9]{9}$/, {
-    message: 'Telefon numarası 10 haneli ve 5 ile başlamalıdır',
+    message: 'Telefon numarası 10 haneli olmalıdır ve 5 ile başlamalıdır',
   })
   phone?: string;
 }

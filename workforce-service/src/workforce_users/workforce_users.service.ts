@@ -25,7 +25,7 @@ export class WorkforceUsersService {
     // 2. Varsa GlobalExceptionFilter'ın beklediği formatta 409 fırlat
     if (existingWorkforceUser) {
       throw new RpcException({
-        status: HttpStatus.CONFLICT, // 409
+        statusCode: HttpStatus.CONFLICT, // 409
         message: 'Bu sicil numarasıyla kayıtlı bir personel zaten var.',
       });
     }
@@ -93,7 +93,7 @@ export class WorkforceUsersService {
     // 2. Yoksa GlobalExceptionFilter'ın beklediği formatta 404 fırlat
     if (!workforceUser) {
       throw new RpcException({
-        status: HttpStatus.NOT_FOUND,
+        statusCode: HttpStatus.NOT_FOUND,
         message: 'Personel bulunamadı.',
       });
     }
@@ -111,14 +111,6 @@ export class WorkforceUsersService {
         const existingWorkforceUser = await this.workforceUserRepository.findOne({
           where: { firstName: updateWorkforceUserDto.firstName },
         });
-  
-        // Bu ad başka bir personelde varsa 409 Conflict fırlat
-        if (existingWorkforceUser) {
-          throw new RpcException({
-            statusCode: HttpStatus.CONFLICT, // 409
-            message: 'Bu isimde bir personel zaten var',
-          });
-        }
       }
   
       // 3. Yalnızca gönderilen (undefined olmayan) alanları güncelle
