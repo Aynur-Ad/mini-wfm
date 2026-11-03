@@ -42,3 +42,37 @@ export interface ApiErrorResponse {
   statusCode: number;
   message: string | string[];
 }
+
+// Personel backend'inin JSON yanıtı; tarihler metin, boş telefon null gelir.
+export interface WorkforceUser {
+  id: number;
+  firstName: string;
+  lastName: string;
+  registrationNumber: string;
+  phone: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateWorkforceUserDto {
+  firstName: string;
+  lastName: string;
+  registrationNumber: string;
+  phone?: string | null;
+}
+
+export interface UpdateWorkforceUserDto {
+  firstName?: string;
+  lastName?: string;
+  registrationNumber?: string;
+  phone?: string | null;
+  isActive?: boolean;
+}
+
+export interface QueryWorkforceUsersParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+  isActive?: boolean;
+}
