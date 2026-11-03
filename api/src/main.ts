@@ -39,4 +39,4 @@ async function bootstrap() {
   console.log(`Swagger docs available at http://localhost:${port}/docs`);
 }
 
-bootstrap(); // bootstrap fonksiyonunu çağırarak tüm bu süreci fiilen başlatır.
+void bootstrap(); // bootstrap fonksiyonunu çağırarak tüm bu süreci fiilen başlatır.

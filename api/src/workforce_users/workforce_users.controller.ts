@@ -1,67 +1,152 @@
 import {
-    Body,
-    Controller,
-    Get,
-    Inject,
-    Param,
-    ParseIntPipe,
-    Post,
-} from "@nestjs/common";
-
-import { ClientProxy } from "@nestjs/microservices";
-
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Inject,
+  Param,
+  ParseIntPipe,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
+import { ClientProxy } from '@nestjs/microservices';
 import {
-    ApiBadRequestResponse,
-    ApiConflictResponse,
-    ApiCreatedResponse,
-    ApiNotFoundResponse,
-    ApiOkResponse,
-    ApiOperation,
-    ApiParam,
-    ApiTags,
+  ApiBadRequestResponse,
+  ApiConflictResponse,
+  ApiCreatedResponse,
+  ApiNoContentResponse,
+  ApiNotFoundResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiParam,
+  ApiTags,
 } from '@nestjs/swagger';
-
+import { map, Observable } from 'rxjs';
 import { CreateWorkforceUserDto } from './dto/create-workforce_user.dto.js';
-import { Observable } from "rxjs";
+import { QueryWorkforceUsersDto } from './dto/query-workforce_users.dto.js';
+import { UpdateWorkforceUserDto } from './dto/update-workforce_user.dto.js';
+import {
+  WorkforceUserResponseDto,
+  WorkforceUsersPageDto,
+} from './dto/workforce_user-response.dto.js';
 
 @ApiTags('Workforce_Users')
-@Controller('workforce-users') // main.ts'deki setGlobalPrefix('api') sayesinde /api/workforce-users olur
+@Controller('workforce-users')
 export class WorkforceUsersController {
-    constructor(
-        @Inject('WORKFORCE_SERVICE') private readonly workforceClient: ClientProxy,
-    ) {}
+  constructor(
+    @Inject('WORKFORCE_SERVICE') private readonly workforceClient: ClientProxy,
+  ) {}
 
-    @Post()
-    @ApiOperation({ summary: 'Yeni bir personel oluşturur' })
+  @Post()
+  @ApiOperation({ summary: 'Yeni bir personel oluşturur' })
+  @ApiCreatedResponse({
+    description: 'Personel başarıyla oluşturuldu',
+    type: WorkforceUserResponseDto,
+  })
+  @ApiBadRequestResponse({
+    description: 'Ad, soyad, sicil numarası veya telefon doğrulama hatası',
+  })
+  @ApiConflictResponse({
+    description: 'Sicil numarası başka personelde kullanılıyor',
+  })
+  create(
+    @Body() dto: CreateWorkforceUserDto,
+  ): Observable<WorkforceUserResponseDto> {
+    return this.workforceClient.send('createWorkforceUser', dto);
+  }
 
-    @ApiCreatedResponse({ description: 'Personel başarıyla oluşturuldu' })
-    
-    @ApiBadRequestResponse({ description: 'Doğrulama hatası (firstName boş veya 100 karakterden uzun)' })
-    @ApiBadRequestResponse({ description: 'Doğrulama hatası (lastName boş veya 100 karakterden uzun)' })
-    @ApiBadRequestResponse({ description: 'Doğrulama hatası (registrationNumber boş veya 20 karakterden uzun)' })
-    @ApiBadRequestResponse({ description: 'Doğrulama hatası (phone 5 ile başlamak zorundadır ve 10 karakter olmak zorundadır)' })
-    
-    @ApiConflictResponse({ description: 'Bu sicil numarasına sahip bir personel zaten var' })
+  @Get()
+  @ApiOperation({
+    summary: 'Personelleri sayfalı, aranabilir ve filtrelenebilir listeler',
+  })
+  @ApiOkResponse({
+    description: 'Personel listesi',
+    type: WorkforceUsersPageDto,
+  })
+  @ApiBadRequestResponse({
+    description: 'Geçersiz sayfa, limit veya aktiflik filtresi',
+  })
+  findAll(
+    @Query() query: QueryWorkforceUsersDto,
+  ): Observable<WorkforceUsersPageDto> {
+    return this.workforceClient.send('findAllWorkforceUsers', query);
+  }
 
-    create(@Body() createWorkforceUserDto: CreateWorkforceUserDto): Observable<unknown> {
-        return this.workforceClient.send('createWorkforceUser', createWorkforceUserDto);
-    }
+  @Get(':id')
+  @ApiOperation({ summary: 'ID bilgisine göre personel detayını getirir' })
+  @ApiParam({
+    name: 'id',
+    type: Number,
+    description: 'Personelin kimliği',
+    example: 1,
+  })
+  @ApiOkResponse({
+    description: 'Personel detayı',
+    type: WorkforceUserResponseDto,
+  })
+  @ApiBadRequestResponse({ description: 'Geçersiz ID formatı' })
+  @ApiNotFoundResponse({ description: 'Personel bulunamadı' })
+  findOne(
+    @Param('id', ParseIntPipe) id: number,
+  ): Observable<WorkforceUserResponseDto> {
+    return this.workforceClient.send('findOneWorkforceUser', id);
+  }
 
-     @Get(':id')
-      @ApiOperation({ summary: 'ID bilgisine göre personel detayını getirir' })
-      @ApiParam({
-        name: 'id',
-        type: Number,
-        description: 'Personelin sayısal ID değeri',
-        example: 1,
-      })
-      @ApiOkResponse({ description: 'Personel detayı başarıyla getirildi' })
-      @ApiBadRequestResponse({ description: 'Geçersiz ID formatı (sayı değil)' })
-      @ApiNotFoundResponse({ description: 'Personel bulunamadı' })
-      findOne(@Param('id', ParseIntPipe) id: number): Observable<unknown> {
-        return this.workforceClient.send('findOneWorkforceUser', id);
-      }
+  @Patch(':id')
+  @ApiOperation({
+    summary: 'Personelin yalnızca gönderilen alanlarını günceller',
+  })
+  @ApiParam({
+    name: 'id',
+    type: Number,
+    description: 'Personelin kimliği',
+    example: 1,
+  })
+  @ApiOkResponse({
+    description: 'Güncel personel',
+    type: WorkforceUserResponseDto,
+  })
+  @ApiBadRequestResponse({ description: 'Geçersiz ID veya güncelleme verisi' })
+  @ApiNotFoundResponse({ description: 'Personel bulunamadı' })
+  @ApiConflictResponse({
+    description: 'Sicil numarası başka personelde kullanılıyor',
+  })
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateWorkforceUserDto,
+  ): Observable<WorkforceUserResponseDto> {
+    // Adresteki kimlik esastır; body içindeki yabancı alanlar kimliği değiştiremez.
+    return this.workforceClient.send('updateWorkforceUser', {
+      firstName: dto.firstName,
+      lastName: dto.lastName,
+      registrationNumber: dto.registrationNumber,
+      phone: dto.phone,
+      isActive: dto.isActive,
+      id,
+    });
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Personeli kalıcı olarak siler' })
+  @ApiParam({
+    name: 'id',
+    type: Number,
+    description: 'Personelin kimliği',
+    example: 1,
+  })
+  @ApiNoContentResponse({
+    description: 'Personel silindi; yanıt gövdesi boştur',
+  })
+  @ApiBadRequestResponse({ description: 'Geçersiz ID formatı' })
+  @ApiNotFoundResponse({ description: 'Personel bulunamadı' })
+  remove(@Param('id', ParseIntPipe) id: number): Observable<void> {
+    // TCP silme yanıtını koruyup HTTP tarafında boş gövdeye çevirir.
+    return this.workforceClient
+      .send('removeWorkforceUser', id)
+      .pipe(map(() => undefined));
+  }
 }
-
-
-

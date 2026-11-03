@@ -1,26 +1,24 @@
 import { HttpStatus } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
-import { Test, TestingModule } from '@nestjs/testing';
+import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { ILike } from 'typeorm';
+import { ILike, QueryFailedError } from 'typeorm';
 import { vi } from 'vitest';
 import { WorkforceUser } from './entities/workforce_user.entity.js';
 import { WorkforceUsersService } from './workforce_users.service.js';
 
-describe('WorkforceUsersService', () => {
-  let service: WorkforceUsersService;
+const conflict = {
+  error: {
+    statusCode: HttpStatus.CONFLICT,
+    message: 'Bu sicil numarasıyla kayıtlı bir personel zaten var.',
+  },
+};
+const notFound = {
+  error: { statusCode: HttpStatus.NOT_FOUND, message: 'Personel bulunamadı.' },
+};
 
-  // TypeORM Repository metodlarının sahte (mock) karşılıkları
-  const mockWorkforceUserRepository = {
-    findOne: vi.fn(),
-    create: vi.fn(),
-    save: vi.fn(),
-    findAndCount: vi.fn(),
-    remove: vi.fn(),
-  };
-
-  // Testlerde kullanacağımız örnek personel verisi
-  const mockWorkforceUser: WorkforceUser = {
+function person(): WorkforceUser {
+  return {
     id: 10,
     firstName: 'Akgün',
     lastName: 'Gökalp',
@@ -30,92 +28,320 @@ describe('WorkforceUsersService', () => {
     createdAt: new Date('2026-10-15T10:00:00Z'),
     updatedAt: new Date('2026-10-15T10:00:00Z'),
   };
+}
+
+function duplicateKeyError() {
+  return new QueryFailedError(
+    'INSERT',
+    [],
+    Object.assign(new Error('duplicate key'), { code: '23505' }),
+  );
+}
+
+describe('WorkforceUsersService', () => {
+  let service: WorkforceUsersService;
+  let current: WorkforceUser;
+  const repository = {
+    findOne: vi.fn(),
+    create: vi.fn(),
+    save: vi.fn(),
+    findAndCount: vi.fn(),
+    remove: vi.fn(),
+  };
 
   beforeEach(async () => {
-    vi.clearAllMocks();
-
-    const module: TestingModule = await Test.createTestingModule({
+    vi.resetAllMocks();
+    current = person();
+    const module = await Test.createTestingModule({
       providers: [
         WorkforceUsersService,
-        {
-          provide: getRepositoryToken(WorkforceUser),
-          useValue: mockWorkforceUserRepository,
-        },
+        { provide: getRepositoryToken(WorkforceUser), useValue: repository },
       ],
     }).compile();
-
-    service = module.get<WorkforceUsersService>(WorkforceUsersService);
+    service = module.get(WorkforceUsersService);
+    repository.save.mockImplementation((value: WorkforceUser) =>
+      Promise.resolve(value),
+    );
   });
 
   describe('create', () => {
-    it('yeni bir personel oluşturur ve kaydeder', async () => {
-      const dto = {
-        firstName: 'Akgün',
-        lastName: 'Gökalp',
-        registrationNumber: '123456',
-        phone: '5551239516',
-      };
-      mockWorkforceUserRepository.findOne.mockResolvedValue(null);
-      mockWorkforceUserRepository.create.mockReturnValue(mockWorkforceUser);
-      mockWorkforceUserRepository.save.mockResolvedValue(mockWorkforceUser);
+    const dto = {
+      firstName: 'Akgün',
+      lastName: 'Gökalp',
+      registrationNumber: '123456',
+      phone: '5551239516',
+    };
 
-      const result = await service.create(dto);
-
-      expect(mockWorkforceUserRepository.findOne).toHaveBeenCalledWith({
+    it('yeni personeli sicil kontrolünden sonra oluşturur, kaydeder ve döndürür', async () => {
+      repository.findOne.mockResolvedValue(null);
+      repository.create.mockReturnValue(current);
+      expect(await service.create(dto)).toEqual(current);
+      expect(repository.findOne).toHaveBeenCalledWith({
         where: { registrationNumber: dto.registrationNumber },
       });
-      expect(mockWorkforceUserRepository.create).toHaveBeenCalledWith({
-        firstName: dto.firstName,
-        lastName: dto.lastName,
-        registrationNumber: dto.registrationNumber,
-        phone: dto.phone,
-      });
-      expect(mockWorkforceUserRepository.save).toHaveBeenCalledWith(
-        mockWorkforceUser,
-      );
-      expect(result).toEqual(mockWorkforceUser);
+      expect(repository.create).toHaveBeenCalledWith(dto);
+      expect(repository.save).toHaveBeenCalledWith(current);
     });
 
-    it('aynı kayıt numarasına sahip personel varsa 409 fırlatır ve veritabanına kaydetme çağrısı yapmaz', async () => {
-      const dto = {
-        firstName: 'Akgün',
-        lastName: 'Gökalp',
-        registrationNumber: '123456',
-      };
-      mockWorkforceUserRepository.findOne.mockResolvedValue(mockWorkforceUser);
-
-      await expect(service.create(dto)).rejects.toThrow(RpcException);
-      await expect(service.create(dto)).rejects.toMatchObject({
-        error: {
-          statusCode: HttpStatus.CONFLICT,
-        },
+    it('telefon gönderilmezse null ile kayda hazırlar', async () => {
+      repository.findOne.mockResolvedValue(null);
+      repository.create.mockReturnValue(current);
+      await service.create({
+        firstName: 'Deniz',
+        lastName: 'Kaya',
+        registrationNumber: 'P1001',
       });
+      expect(repository.create).toHaveBeenCalledWith({
+        firstName: 'Deniz',
+        lastName: 'Kaya',
+        registrationNumber: 'P1001',
+        phone: null,
+      });
+    });
 
-      expect(mockWorkforceUserRepository.save).not.toHaveBeenCalled();
+    it('sicil kullanılıyorsa 409 fırlatır ve hiçbir kayıt işlemi yapmaz', async () => {
+      repository.findOne.mockResolvedValue(current);
+      const result = service.create(dto);
+      await expect(result).rejects.toBeInstanceOf(RpcException);
+      await expect(result).rejects.toMatchObject(conflict);
+      expect(repository.create).not.toHaveBeenCalled();
+      expect(repository.save).not.toHaveBeenCalled();
+    });
+
+    it('eşzamanlı kayıtta veritabanı tekillik hatasını da 409 olarak taşır', async () => {
+      repository.findOne.mockResolvedValue(null);
+      repository.create.mockReturnValue(current);
+      repository.save.mockRejectedValue(duplicateKeyError());
+      await expect(service.create(dto)).rejects.toMatchObject(conflict);
+    });
+
+    it('beklenmeyen kayıt hatasını yanlışlıkla 409 olarak değiştirmez', async () => {
+      const error = new Error('database disconnected');
+      repository.findOne.mockResolvedValue(null);
+      repository.create.mockReturnValue(current);
+      repository.save.mockRejectedValue(error);
+      await expect(service.create(dto)).rejects.toBe(error);
+    });
+
+    it('başka bir PostgreSQL hatasını tekillik çakışması olarak yorumlamaz', async () => {
+      const error = new QueryFailedError(
+        'INSERT',
+        [],
+        Object.assign(new Error('not null'), { code: '23502' }),
+      );
+      repository.findOne.mockResolvedValue(null);
+      repository.create.mockReturnValue(current);
+      repository.save.mockRejectedValue(error);
+      await expect(service.create(dto)).rejects.toBe(error);
     });
   });
 
   describe('findOne', () => {
-    it('personel bulunduğunda personel detayını döner', async () => {
-      mockWorkforceUserRepository.findOne.mockResolvedValue(mockWorkforceUser);
-
-      const result = await service.findOne(1);
-
-      expect(mockWorkforceUserRepository.findOne).toHaveBeenCalledWith({
-        where: { id: 1 },
-      });
-      expect(result).toEqual(mockWorkforceUser);
+    it('personeli istenen kimlikle arar ve döndürür', async () => {
+      repository.findOne.mockResolvedValue(current);
+      expect(await service.findOne(10)).toEqual(current);
+      expect(repository.findOne).toHaveBeenCalledWith({ where: { id: 10 } });
     });
 
-    it('personel bulunamadığında 404 fırlatır', async () => {
-      mockWorkforceUserRepository.findOne.mockResolvedValue(null);
+    it('personel yoksa 404 fırlatır', async () => {
+      repository.findOne.mockResolvedValue(null);
+      await expect(service.findOne(999)).rejects.toMatchObject(notFound);
+    });
+  });
 
-      await expect(service.findOne(999)).rejects.toThrow(RpcException);
-      await expect(service.findOne(999)).rejects.toMatchObject({
-        error: {
-          statusCode: HttpStatus.NOT_FOUND,
-        },
+  describe('findAll', () => {
+    it('varsayılan ilk sayfayı ve filtreye uyan toplamı döndürür', async () => {
+      repository.findAndCount.mockResolvedValue([[current], 25]);
+      expect(await service.findAll()).toEqual({
+        data: [current],
+        total: 25,
+        page: 1,
+        limit: 10,
       });
+      expect(repository.findAndCount).toHaveBeenCalledWith({
+        where: {},
+        order: { createdAt: 'DESC', id: 'DESC' },
+        skip: 0,
+        take: 10,
+      });
+    });
+
+    it('ad VE soyad yerine ad VEYA soyad VEYA sicil arar; durum filtresini her dala uygular', async () => {
+      repository.findAndCount.mockResolvedValue([[current], 11]);
+      expect(
+        await service.findAll({
+          page: 2,
+          limit: 5,
+          search: '  gün  ',
+          isActive: false,
+        }),
+      ).toEqual({ data: [current], total: 11, page: 2, limit: 5 });
+      expect(repository.findAndCount).toHaveBeenCalledWith({
+        where: [
+          { isActive: false, firstName: ILike('%gün%') },
+          { isActive: false, lastName: ILike('%gün%') },
+          { isActive: false, registrationNumber: ILike('%gün%') },
+        ],
+        order: { createdAt: 'DESC', id: 'DESC' },
+        skip: 5,
+        take: 5,
+      });
+    });
+
+    it('arama olmadan false filtresini korur ve boş sayfada toplamı sıfırlamaz', async () => {
+      repository.findAndCount.mockResolvedValue([[], 3]);
+      expect(
+        await service.findAll({ page: 2, limit: 10, isActive: false }),
+      ).toEqual({ data: [], total: 3, page: 2, limit: 10 });
+      expect(repository.findAndCount).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { isActive: false }, skip: 10 }),
+      );
+    });
+
+    it('yalnızca boşluk içeren aramayı filtre olarak kullanmaz', async () => {
+      repository.findAndCount.mockResolvedValue([[], 0]);
+      await service.findAll({ search: '   ' });
+      expect(repository.findAndCount).toHaveBeenCalledWith(
+        expect.objectContaining({ where: {} }),
+      );
+    });
+
+    it('durum seçilmemiş aramada aktiflik filtresi eklemez', async () => {
+      repository.findAndCount.mockResolvedValue([[current], 1]);
+      await service.findAll({ search: '123' });
+      expect(repository.findAndCount).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: [
+            { firstName: ILike('%123%') },
+            { lastName: ILike('%123%') },
+            { registrationNumber: ILike('%123%') },
+          ],
+        }),
+      );
+    });
+  });
+
+  describe('update', () => {
+    it('yalnızca gönderilen telefonu değiştirir, diğer alanları korur', async () => {
+      repository.findOne.mockResolvedValue(current);
+      const result = await service.update(10, { id: 10, phone: '5321234567' });
+      expect(result).toEqual(Object.assign(person(), { phone: '5321234567' }));
+      expect(repository.findOne).toHaveBeenCalledTimes(1);
+      expect(repository.save).toHaveBeenCalledWith(result);
+    });
+
+    it('false değerini gönderilmemiş saymaz ve personeli pasife alır', async () => {
+      repository.findOne.mockResolvedValue(current);
+      expect(
+        (await service.update(10, { id: 10, isActive: false })).isActive,
+      ).toBe(false);
+    });
+
+    it('personelin kendi sicilini tekrar göndermesine izin verir', async () => {
+      repository.findOne.mockResolvedValue(current);
+      await service.update(10, {
+        id: 10,
+        registrationNumber: current.registrationNumber,
+      });
+      expect(repository.findOne).toHaveBeenCalledTimes(1);
+      expect(repository.save).toHaveBeenCalledOnce();
+    });
+
+    it('ad değişikliğinde ad tekilliği aramaz', async () => {
+      repository.findOne.mockResolvedValue(current);
+      expect(
+        (await service.update(10, { id: 10, firstName: 'Deniz' })).firstName,
+      ).toBe('Deniz');
+      expect(repository.findOne).toHaveBeenCalledTimes(1);
+    });
+
+    it('yeni sicil kullanılmıyorsa sicili değiştirir', async () => {
+      repository.findOne
+        .mockResolvedValueOnce(current)
+        .mockResolvedValueOnce(null);
+      const result = await service.update(10, {
+        id: 10,
+        registrationNumber: 'NEW001',
+      });
+      expect(repository.findOne).toHaveBeenNthCalledWith(2, {
+        where: { registrationNumber: 'NEW001' },
+      });
+      expect(result.registrationNumber).toBe('NEW001');
+    });
+
+    it('başka personelin sicili verilirse 409 fırlatır ve mevcut kaydı değiştirmez', async () => {
+      repository.findOne
+        .mockResolvedValueOnce(current)
+        .mockResolvedValueOnce(
+          Object.assign(person(), { id: 20, registrationNumber: 'OTHER' }),
+        );
+      await expect(
+        service.update(10, {
+          id: 10,
+          registrationNumber: 'OTHER',
+          firstName: 'Yeni',
+        }),
+      ).rejects.toMatchObject(conflict);
+      expect(repository.save).not.toHaveBeenCalled();
+      expect(current).toEqual(person());
+    });
+
+    it('olmayan personelde 404 fırlatır ve kaydetmez', async () => {
+      repository.findOne.mockResolvedValue(null);
+      await expect(
+        service.update(999, { id: 999, firstName: 'Deniz' }),
+      ).rejects.toMatchObject(notFound);
+      expect(repository.save).not.toHaveBeenCalled();
+    });
+
+    it('telefon null gönderilirse telefonu boşaltır', async () => {
+      repository.findOne.mockResolvedValue(current);
+      expect(
+        (await service.update(10, { id: 10, phone: null })).phone,
+      ).toBeNull();
+    });
+
+    it('birden fazla alanı günceller ve gönderilmeyen sicili korur', async () => {
+      repository.findOne.mockResolvedValue(current);
+      expect(
+        await service.update(10, {
+          id: 10,
+          firstName: 'Deniz',
+          lastName: 'Kaya',
+          isActive: false,
+        }),
+      ).toEqual(
+        Object.assign(person(), {
+          firstName: 'Deniz',
+          lastName: 'Kaya',
+          isActive: false,
+        }),
+      );
+    });
+
+    it('güncelleme sırasında oluşan tekillik yarışını da 409 olarak taşır', async () => {
+      repository.findOne
+        .mockResolvedValueOnce(current)
+        .mockResolvedValueOnce(null);
+      repository.save.mockRejectedValue(duplicateKeyError());
+      await expect(
+        service.update(10, { id: 10, registrationNumber: 'NEW001' }),
+      ).rejects.toMatchObject(conflict);
+    });
+  });
+
+  describe('remove', () => {
+    it('mevcut personeli siler ve mevcut TCP yanıt biçimini korur', async () => {
+      repository.findOne.mockResolvedValue(current);
+      repository.remove.mockResolvedValue(current);
+      expect(await service.remove(10)).toEqual({ deleted: true, id: 10 });
+      expect(repository.remove).toHaveBeenCalledWith(current);
+    });
+
+    it('olmayan personelde 404 verir ve silme çağrısı yapmaz', async () => {
+      repository.findOne.mockResolvedValue(null);
+      await expect(service.remove(999)).rejects.toMatchObject(notFound);
+      expect(repository.remove).not.toHaveBeenCalled();
     });
   });
 });

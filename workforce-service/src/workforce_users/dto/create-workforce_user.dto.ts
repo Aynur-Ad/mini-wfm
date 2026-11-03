@@ -2,5 +2,5 @@ export class CreateWorkforceUserDto {
     firstName: string;
     lastName: string;
     registrationNumber: string;
-    phone?: string;
+    phone?: string | null;
 }
