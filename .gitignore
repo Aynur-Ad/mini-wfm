@@ -18,3 +18,16 @@ pnpm-debug.log*
 # İşletim Sistemi Dosyaları
 .DS_Store
 Thumbs.db
+
+# TypeScript derleme önbelleği
+*.tsbuildinfo
+
+# Test kapsamı raporları
+coverage/
+
+# Yerel ortam dosyaları
+.env.*
+!.env.example
+
+# Log dosyaları
+*.log
