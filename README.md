@@ -4,7 +4,7 @@ Mini WFM, ekip ve personel kayıtlarının yönetildiği bir staj projesidir. Ek
 
 Proje üç uygulamadan oluşur:
 
-- **web:** React arayüzüdür. Ekip ekranlarını gösterir ve API üzerinden veri alır.
+- **web:** React arayüzüdür. Ekip ve personel ekranlarını gösterir ve API üzerinden veri alır.
 - **api:** HTTP isteklerini karşılar, gelen veriyi DTO kurallarıyla doğrular ve TCP üzerinden workforce-service'e iletir. Veritabanına bağlanmaz.
 - **workforce-service:** İş kurallarını uygular ve TypeORM üzerinden PostgreSQL'e erişir.
 
@@ -18,7 +18,7 @@ Komutlar **Windows PowerShell** içindir. Aksi belirtilmedikçe komutları `api`
 | pnpm | 10 veya üzeri; hazırlanan sürüm 11.25.0 ile kontrol edildi |
 | Git | Depoyu indirmek ve sürüm kontrolü için |
 | Docker Desktop ve Docker Compose | PostgreSQL'i çalıştırmak için |
-| Tarayıcı | Swagger üzerinden API'yi denemek için |
+| Tarayıcı | Web arayüzünü ve Swagger'ı kullanmak için |
 | DBeaver veya benzeri araç | İsteğe bağlı; veritabanını incelemek için |
 
 Nest CLI proje bağımlılıklarında bulunduğu için ayrıca global kurulması gerekmez. Docker komutlarını çalıştırmadan önce Docker Desktop'ı açın.
@@ -137,7 +137,19 @@ Tarayıcıda [http://localhost:5173](http://localhost:5173) adresini açın. Por
 
 Vite, `/api` ile başlayan istekleri `http://localhost:3000` adresine yönlendirir. Frontend HTTP istemcisinin temel yolu `/api` olarak tanımlıdır. Mevcut ayarlarla frontend için ayrıca `.env` dosyası oluşturmanız gerekmez.
 
-Ekip ekranları frontend üzerinden kullanılabilir. `/workforce-users` sayfasının yalnızca Personeller başlığını göstermesi mevcut Task 17 sürümünde beklenen durumdur; personel işlemlerini Swagger'dan deneyin.
+Ekip listesi `/teams`, personel listesi `/workforce-users` adresindedir. Personel sicil numarasına tıklanınca `/workforce-users/:id` detay sayfası açılır.
+
+### Komutları uygulamanın kendi klasöründe çalıştırma
+
+Yukarıdaki `--dir` komutları proje kökü içindir. Terminal zaten ilgili uygulama klasöründeyse aşağıdaki komutları kullanın; tekrar `--dir web` gibi bir klasör belirtmeyin.
+
+| Bulunduğunuz klasör | Çalıştırma komutu |
+| --- | --- |
+| `workforce-service` | `pnpm run start:dev` |
+| `api` | `pnpm run start:dev` |
+| `web` | `pnpm run dev` |
+
+Web klasöründe derleme ve lint kontrolü için sırasıyla `pnpm run build` ve `pnpm run lint` çalıştırın. Her uygulamayı ayrı terminalde açık tutun.
 
 ## Port listesi
 
@@ -229,6 +241,20 @@ Beklenen davranışlar:
 - PATCH yalnızca gönderilen alanları değiştirir. `isActive: false` personeli pasife alır.
 - Liste sorgusunda `page`, `limit`, `search` ve `isActive` kullanılabilir. Arama ad, soyad veya sicilde yapılır. Varsayılan limit 10, en büyük limit 100'dür.
 - Personel silme: **204** ve boş gövde. Silinen kaydın detayı: **404**.
+
+## Personel ekranlarını kontrol etme (Task 18)
+
+Üç uygulama ve PostgreSQL açıkken web menüsünden **Personeller** sayfasına girin.
+
+- **Liste:** Sicil No, Ad Soyad, Telefon, Durum ve İşlemler kolonları gösterilir. Telefon `532 123 45 67` biçimindedir; boş telefon `-` görünür. Liste sunucudan sayfalı alınır.
+- **Arama ve filtre:** Ad, soyad veya sicilin bir kısmıyla arayın. Arama, yazma durduktan 400 ms sonra gönderilir. Tümü/Aktif/Pasif filtresi aramayla birlikte çalışır; filtre değişince ilk sayfaya dönülür.
+- **Oluşturma ve düzenleme:** Yeni Personel veya Düzenle butonunu kullanın. Ad/soyad zorunlu ve en fazla 100, sicil zorunlu ve en fazla 20 karakterdir. Telefon isteğe bağlıdır; girilirse 5 ile başlayan 10 rakam olmalıdır. Boşluklardan oluşan zorunlu alanlar kabul edilmez.
+- **Hata ve başarı:** Başarılı kayıtta liste/detay güncellenir. Tekrarlanan sicilde backend'in 409 bildirimi gösterilir ve formdaki değerler korunur. Düzenlemede telefonu boşaltmak mevcut numarayı temizler.
+- **Durum:** Satırdaki anahtarla aktif/pasif durumunu değiştirin. Sayfayı yenileyerek değişikliğin korunduğunu kontrol edin.
+- **Silme:** Önce onaydan vazgeçin; kayıt kalmalıdır. Ardından onaylayın; kayıt listeden kalkmalıdır. Son sayfanın son kaydı silinirse geçerli önceki sayfaya dönülür.
+- **Detay:** Sicil bağlantısından personel bilgilerini açın. Düzenleme sonrası bilgilerin güncellendiğini kontrol edin. Veritabanında bulunmayan bir ID için Personel bulunamadı ekranı ve Listeye dön butonu gösterilir. Bağlantı/sunucu hatalarında ayrı bir hata ekranı ve yeniden deneme bulunur.
+
+Bu kontroller gerçek servisler ve veritabanıyla yapılır. Frontend build/lint kontrolü veya mock kullanılan testler tek başına bu uçtan uca kontrolün yerini tutmaz.
 
 ## Veritabanını inceleme
 

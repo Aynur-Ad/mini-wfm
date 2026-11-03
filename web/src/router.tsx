@@ -3,6 +3,7 @@ import { AppLayout } from "./components/app-layout";
 import { TeamsPage } from "./pages/teams-page";
 import { TeamDetailPage } from "./pages/team-detail-page";
 import { WorkforceUsersPage } from "./pages/workforce-users-page";
+import { WorkforceUserDetailPage } from "./pages/workforce-user-detail-page";
 import { NotFoundPage } from "./pages/not-found-page";
 
 export const router = createBrowserRouter([
@@ -25,6 +26,10 @@ export const router = createBrowserRouter([
       {
         path: "workforce-users",
         element: <WorkforceUsersPage />,
+      },
+      {
+        path: "workforce-users/:id",
+        element: <WorkforceUserDetailPage />,
       },
       {
         path: "*",
