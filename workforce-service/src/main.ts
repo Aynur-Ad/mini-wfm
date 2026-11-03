@@ -14,4 +14,4 @@ async function bootstrap() {
   console.log('Workforce microservice is listening on TCP port 4001');
 }
 
-bootstrap();
+void bootstrap();

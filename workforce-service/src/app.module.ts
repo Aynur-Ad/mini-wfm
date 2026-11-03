@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { dbConfig } from './data-source.js';
 import { AppController } from './app.controller.js';
 import { TeamsModule } from './teams/teams.module.js';
+import { WorkforceUsersModule } from './workforce_users/workforce_users.module.js';
 
 
 @Module({
@@ -14,6 +15,7 @@ import { TeamsModule } from './teams/teams.module.js';
     }),
     TypeOrmModule.forRoot(dbConfig),
     TeamsModule,
+    WorkforceUsersModule,
   ],
   controllers: [AppController],
 })
