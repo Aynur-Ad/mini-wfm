@@ -6,6 +6,7 @@ import { ILike, QueryFailedError } from 'typeorm';
 import { vi } from 'vitest';
 import { WorkforceUser } from './entities/workforce_user.entity.js';
 import { WorkforceUsersService } from './workforce_users.service.js';
+import { Team } from '../teams/entities/team.entity.js';
 
 const conflict = {
   error: {
@@ -25,6 +26,8 @@ function person(): WorkforceUser {
     registrationNumber: '123456',
     phone: '5551239516',
     isActive: true,
+    teamId: null,
+    team: null,
     createdAt: new Date('2026-10-15T10:00:00Z'),
     updatedAt: new Date('2026-10-15T10:00:00Z'),
   };
@@ -41,17 +44,26 @@ function duplicateKeyError() {
 describe('WorkforceUsersService', () => {
   let service: WorkforceUsersService;
   let current: WorkforceUser;
+  const teamRepository = { findOne: vi.fn() };
   const repository = {
     findOne: vi.fn(),
     create: vi.fn(),
     save: vi.fn(),
     findAndCount: vi.fn(),
     remove: vi.fn(),
+    manager: { transaction: vi.fn() },
   };
 
   beforeEach(async () => {
     vi.resetAllMocks();
     current = person();
+    repository.manager.transaction.mockImplementation(
+      (work: (manager: unknown) => unknown) =>
+        work({
+          getRepository: (entity: unknown) =>
+            entity === Team ? teamRepository : repository,
+        }),
+    );
     const module = await Test.createTestingModule({
       providers: [
         WorkforceUsersService,
@@ -79,7 +91,11 @@ describe('WorkforceUsersService', () => {
       expect(repository.findOne).toHaveBeenCalledWith({
         where: { registrationNumber: dto.registrationNumber },
       });
-      expect(repository.create).toHaveBeenCalledWith(dto);
+      expect(repository.create).toHaveBeenCalledWith({
+        ...dto,
+        teamId: null,
+        team: null,
+      });
       expect(repository.save).toHaveBeenCalledWith(current);
     });
 
@@ -96,6 +112,8 @@ describe('WorkforceUsersService', () => {
         lastName: 'Kaya',
         registrationNumber: 'P1001',
         phone: null,
+        teamId: null,
+        team: null,
       });
     });
 
@@ -140,7 +158,13 @@ describe('WorkforceUsersService', () => {
     it('personeli istenen kimlikle arar ve döndürür', async () => {
       repository.findOne.mockResolvedValue(current);
       expect(await service.findOne(10)).toEqual(current);
-      expect(repository.findOne).toHaveBeenCalledWith({ where: { id: 10 } });
+      expect(repository.findOne).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 10 },
+          relations: { team: true },
+          select: expect.objectContaining({ team: { id: true, name: true } }),
+        }),
+      );
     });
 
     it('personel yoksa 404 fırlatır', async () => {
@@ -159,6 +183,8 @@ describe('WorkforceUsersService', () => {
         limit: 10,
       });
       expect(repository.findAndCount).toHaveBeenCalledWith({
+        relations: { team: true },
+        select: expect.objectContaining({ team: { id: true, name: true } }),
         where: {},
         order: { createdAt: 'DESC', id: 'DESC' },
         skip: 0,
@@ -177,6 +203,8 @@ describe('WorkforceUsersService', () => {
         }),
       ).toEqual({ data: [current], total: 11, page: 2, limit: 5 });
       expect(repository.findAndCount).toHaveBeenCalledWith({
+        relations: { team: true },
+        select: expect.objectContaining({ team: { id: true, name: true } }),
         where: [
           { isActive: false, firstName: ILike('%gün%') },
           { isActive: false, lastName: ILike('%gün%') },
@@ -222,6 +250,23 @@ describe('WorkforceUsersService', () => {
   });
 
   describe('update', () => {
+    it('atanmış personeli güncellerken üyeliği korur ve ekip özetini döndürür', async () => {
+      current.teamId = 3;
+      repository.findOne.mockResolvedValue(current);
+      teamRepository.findOne.mockResolvedValue({ id: 3, name: 'Saha Ekibi' });
+      const result = await service.update(10, { id: 10, lastName: 'Yeni' });
+      expect(result.teamId).toBe(3);
+      expect(result.team).toEqual({ id: 3, name: 'Saha Ekibi' });
+      expect(repository.findOne).toHaveBeenCalledWith({
+        where: { id: 10 },
+        lock: { mode: 'pessimistic_write' },
+      });
+      expect(teamRepository.findOne).toHaveBeenCalledWith({
+        where: { id: 3 },
+        select: { id: true, name: true },
+      });
+    });
+
     it('yalnızca gönderilen telefonu değiştirir, diğer alanları korur', async () => {
       repository.findOne.mockResolvedValue(current);
       const result = await service.update(10, { id: 10, phone: '5321234567' });

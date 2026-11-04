@@ -256,6 +256,39 @@ Beklenen davranışlar:
 
 Bu kontroller gerçek servisler ve veritabanıyla yapılır. Frontend build/lint kontrolü veya mock kullanılan testler tek başına bu uçtan uca kontrolün yerini tutmaz.
 
+## Personelin ekibe atanması (Task 19)
+
+`workforce_user.team_id` nullable bir foreign key'dir. Bir personel en fazla bir ekibe bağlıdır; bir ekip birden fazla personel içerir. Atanmamış personelde `teamId` ve `team` null döner. Ekipten çıkarmak personel kaydını silmez.
+
+Bu sürümde `1793750400000-AddWorkforceUserTeam.ts` migration'ı eklendi. Eski migration'lar değiştirilmedi. Workforce service başladığında bekleyen migration otomatik çalışır. Mevcut tablonuzu silmeyin ve aynı değişiklik için tekrar migration üretmeyin.
+
+İki servis açıkken Swagger'daki Teams bölümünden şu işlemleri deneyin. Adreslerde ve body'de kendi kayıtlarınızın gerçek ID değerlerini kullanın:
+
+| İşlem | Endpoint | Başarılı cevap |
+| --- | --- | --- |
+| Ekibe ata | POST `/api/teams/:id/members` | 201; güncel personel ve ekip özeti |
+| Ekipten çıkar | DELETE `/api/teams/:id/members/:workforceUserId` | 204; boş gövde |
+
+POST body örneği:
+
+```json
+{
+  "workforceUserId": 10
+}
+```
+
+Atanacak ekip ID değeri URL'den alınır. `teamId`, personel oluşturma/güncelleme DTO'suna eklenmedi; üyelik yalnızca yukarıdaki endpoint'lerle değiştirilir.
+
+- Ekip veya personel yoksa 404 döner.
+- Atama ve çıkarma için ekip ve personel aktif olmalıdır; pasif kayıtta 409 döner. Pasif bir üyenin çıkarılması gerekiyorsa önce ilgili kayıtları aktif hale getirin.
+- Personel zaten aynı veya başka ekibe bağlıysa atama 409 döner; mesaj mevcut ekibin adını ve ID değerini içerir.
+- Çıkarılmak istenen personel belirtilen ekipte değilse 404 döner.
+- Aktif veya pasif üyesi bulunan ekip silinemez; 409 döner.
+- GET `/api/teams/:id` cevabı `members` dizisini içerir; üye yoksa dizi boştur.
+- GET `/api/workforce-users` ve GET `/api/workforce-users/:id` cevaplarında her personelde `teamId` ile `team: { id, name }` veya `team: null` bulunur.
+
+Task 19 backend kapsamındadır. Üyelik endpoint'leri Swagger'dan kullanılabilir; web ekranında atama/çıkarma arayüzü bu görevde eklenmedi.
+
 ## Veritabanını inceleme
 
 DBeaver gibi bir araç için yerel bağlantı bilgileri:

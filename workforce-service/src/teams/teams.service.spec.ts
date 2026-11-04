@@ -5,6 +5,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { ILike } from 'typeorm';
 import { vi } from 'vitest';
 import { Team } from './entities/team.entity.js';
+import { WorkforceUser } from '../workforce_users/entities/workforce_user.entity.js';
 import { TeamsService } from './teams.service.js';
 
 describe('TeamsService', () => {
@@ -17,11 +18,13 @@ describe('TeamsService', () => {
     save: vi.fn(),
     findAndCount: vi.fn(),
     remove: vi.fn(),
+    manager: { transaction: vi.fn() },
   };
 
   // Testlerde kullanacağımız örnek ekip verisi
   const mockTeam: Team = {
     id: 1,
+    members: [],
     name: 'Backend Ekibi',
     description: 'Mikroservis geliştirme ekibi',
     isActive: true,
@@ -29,8 +32,18 @@ describe('TeamsService', () => {
     updatedAt: new Date('2026-10-15T10:00:00Z'),
   };
 
+  const people = { existsBy: vi.fn() };
+
   beforeEach(async () => {
     vi.clearAllMocks();
+    people.existsBy.mockResolvedValue(false);
+    mockTeamRepository.manager.transaction.mockImplementation(
+      (work: (manager: unknown) => unknown) =>
+        work({
+          getRepository: (entity: unknown) =>
+            entity === WorkforceUser ? people : mockTeamRepository,
+        }),
+    );
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -139,6 +152,8 @@ describe('TeamsService', () => {
 
       expect(mockTeamRepository.findOne).toHaveBeenCalledWith({
         where: { id: 1 },
+        relations: { members: true },
+        order: { members: { id: 'ASC' } },
       });
       expect(result).toEqual(mockTeam);
     });
@@ -243,6 +258,7 @@ describe('TeamsService', () => {
 
       expect(mockTeamRepository.findOne).toHaveBeenCalledWith({
         where: { id: 1 },
+        lock: { mode: 'pessimistic_write' },
       });
       expect(mockTeamRepository.remove).toHaveBeenCalledWith(mockTeam);
     });

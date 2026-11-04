@@ -1,5 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger';
 
+export class TeamSummaryDto {
+  @ApiProperty({ example: 1 })
+  id: number;
+  @ApiProperty({ example: 'Backend Ekibi' })
+  name: string;
+}
+
 export class WorkforceUserResponseDto {
   @ApiProperty({ example: 1 })
   id: number;
@@ -13,6 +20,19 @@ export class WorkforceUserResponseDto {
   phone: string | null;
   @ApiProperty({ example: true })
   isActive: boolean;
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    example: 1,
+    description: 'Atanmamış personelde null',
+  })
+  teamId: number | null;
+  @ApiProperty({
+    type: () => TeamSummaryDto,
+    nullable: true,
+    description: 'Ekibin ID ve adı; atanmamış personelde null',
+  })
+  team: TeamSummaryDto | null;
   @ApiProperty({ type: String, format: 'date-time' })
   createdAt: string;
   @ApiProperty({ type: String, format: 'date-time' })
