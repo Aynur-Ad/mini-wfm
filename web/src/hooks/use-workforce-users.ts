@@ -11,9 +11,13 @@ import type {
   QueryWorkforceUsersParams,
   UpdateWorkforceUserDto,
 } from "../types";
+import {
+  TEAMS_QUERY_KEY,
+  WORKFORCE_USERS_QUERY_KEY,
+  workforceUserDetailKey,
+} from "./query-keys";
 
-export const WORKFORCE_USERS_QUERY_KEY = "workforce-users";
-const detailKey = (id: number) => [WORKFORCE_USERS_QUERY_KEY, "detail", id];
+export { WORKFORCE_USERS_QUERY_KEY } from "./query-keys";
 
 export function useWorkforceUsers(params: QueryWorkforceUsersParams) {
   return useQuery({
@@ -24,7 +28,7 @@ export function useWorkforceUsers(params: QueryWorkforceUsersParams) {
 
 export function useWorkforceUser(id: number) {
   return useQuery({
-    queryKey: detailKey(id),
+    queryKey: workforceUserDetailKey(id),
     queryFn: () => getWorkforceUserById(id),
     enabled: Number.isSafeInteger(id) && id > 0,
   });
@@ -53,10 +57,14 @@ export function useUpdateWorkforceUser() {
       payload: UpdateWorkforceUserDto;
     }) => updateWorkforceUser(id, payload),
     onSuccess: (person) => {
-      queryClient.setQueryData(detailKey(person.id), person);
-      return queryClient.invalidateQueries({
-        queryKey: [WORKFORCE_USERS_QUERY_KEY],
-      });
+      queryClient.setQueryData(workforceUserDetailKey(person.id), person);
+      // Üyeler tablosundaki ad/telefon/durum da güncel kalsın.
+      return Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: [WORKFORCE_USERS_QUERY_KEY],
+        }),
+        queryClient.invalidateQueries({ queryKey: [TEAMS_QUERY_KEY] }),
+      ]);
     },
   });
 }
@@ -66,10 +74,16 @@ export function useDeleteWorkforceUser() {
   return useMutation({
     mutationFn: (id: number) => deleteWorkforceUser(id),
     onSuccess: (_result, id) => {
-      queryClient.removeQueries({ queryKey: detailKey(id), exact: true });
-      return queryClient.invalidateQueries({
-        queryKey: [WORKFORCE_USERS_QUERY_KEY, "list"],
+      queryClient.removeQueries({
+        queryKey: workforceUserDetailKey(id),
+        exact: true,
       });
+      return Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: [WORKFORCE_USERS_QUERY_KEY, "list"],
+        }),
+        queryClient.invalidateQueries({ queryKey: [TEAMS_QUERY_KEY] }),
+      ]);
     },
   });
 }

@@ -8,6 +8,18 @@ export interface Team {
   updatedAt: string;
 }
 
+export interface TeamSummary {
+  id: number;
+  name: string;
+}
+
+// Üyede üstteki ekip tekrar bulunmaz; döngüsel veri taşınmaz.
+export type TeamMember = Omit<WorkforceUser, "team">;
+
+export interface TeamDetail extends Team {
+  members: TeamMember[];
+}
+
 // create-team.dto.ts karşılığı
 export interface CreateTeamDto {
   name: string;
@@ -51,6 +63,8 @@ export interface WorkforceUser {
   registrationNumber: string;
   phone: string | null;
   isActive: boolean;
+  teamId: number | null;
+  team: TeamSummary | null;
   createdAt: string;
   updatedAt: string;
 }
