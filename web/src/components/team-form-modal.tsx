@@ -76,7 +76,7 @@ export function TeamFormModal({ open, team, onClose }: TeamFormModalProps) {
       okText="Kaydet"
       cancelText="İptal"
       confirmLoading={isSubmitting}
-      maskClosable={!isSubmitting}
+      mask={{ closable: !isSubmitting }}
       destroyOnHidden
     >
       <Form

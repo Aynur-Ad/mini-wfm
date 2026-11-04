@@ -6,14 +6,21 @@ import {
   Button,
   Descriptions,
   Result,
+  Space,
   Spin,
   Tag,
   Typography,
 } from "antd";
-import { ArrowLeftOutlined, EditOutlined } from "@ant-design/icons";
+import {
+  ArrowLeftOutlined,
+  EditOutlined,
+  ReloadOutlined,
+} from "@ant-design/icons";
+import { isAxiosError } from "axios";
 import dayjs from "dayjs";
 import { TeamFormModal } from "../components/team-form-modal";
 import { useTeam } from "../hooks/use-teams";
+import { TeamMembersPanel } from "../components/team-members-panel";
 
 const { Title } = Typography;
 
@@ -23,9 +30,17 @@ export function TeamDetailPage() {
   const [isEditModalOpen, setIsEditModalOpen] = useState<boolean>(false);
 
   const teamId = Number(id);
-  const isValidId = Number.isInteger(teamId) && teamId > 0;
+  const isValidId = Boolean(
+    id && /^[1-9][0-9]*$/.test(id) && Number.isSafeInteger(teamId),
+  );
 
-  const { data: team, isLoading, isError } = useTeam(isValidId ? teamId : 0);
+  const {
+    data: team,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useTeam(isValidId ? teamId : 0);
 
   // 1. Veri yüklenirken dönen gösterge
   if (isLoading) {
@@ -37,7 +52,7 @@ export function TeamDetailPage() {
   }
 
   // 2. Geçersiz ID veya 404 durumunda "Ekip bulunamadı" ekranı ve "Listeye dön" butonu
-  if (!isValidId || isError || !team) {
+  if (!isValidId || (isAxiosError(error) && error.response?.status === 404)) {
     return (
       <Result
         status="404"
@@ -55,6 +70,31 @@ export function TeamDetailPage() {
       />
     );
   }
+
+  if (isError) {
+    return (
+      <Result
+        status="error"
+        title="Ekip bilgileri yüklenemedi"
+        subTitle="Sunucu bağlantısını kontrol edip yeniden deneyin."
+        extra={
+          <Space>
+            <Button onClick={() => navigate("/teams")}>Listeye dön</Button>
+            <Button
+              type="primary"
+              icon={<ReloadOutlined />}
+              onClick={() => {
+                void refetch();
+              }}
+            >
+              Yeniden dene
+            </Button>
+          </Space>
+        }
+      />
+    );
+  }
+  if (!team) return null;
 
   return (
     <div>
@@ -131,6 +171,8 @@ export function TeamDetailPage() {
           },
         ]}
       />
+
+      <TeamMembersPanel key={team.id} team={team} />
 
       {/* MWFM-14'te yaptığımız düzenleme modal'ı */}
       <TeamFormModal

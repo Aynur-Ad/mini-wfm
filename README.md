@@ -190,7 +190,15 @@ pnpm --dir workforce-service test:cov
 
 Unit testlerin geçmesi, gerçek PostgreSQL bağlantısının ve migration'ların da çalıştığını tek başına doğrulamaz. Bunun için uygulamalar açıkken Swagger kontrolü yapın.
 
-`web/package.json` içinde henüz test script’i bulunmuyor. Frontend için aşağıdaki build ve lint komutlarını kullanın.
+Frontend testleri **Vitest**, **JSDOM** ve **Testing Library** kullanır. Proje kökünde:
+
+```powershell
+pnpm --dir web test
+```
+
+İzleme modunda `pnpm --dir web test:watch` kullanın. Terminal zaten `web` klasöründeyse `pnpm test` veya `pnpm run test:watch` yeterlidir. Task 20 ile eklenen test bağımlılıklarını kurmak için güncel `package.json` ve `pnpm-lock.yaml` dosyalarını birlikte alın; `web` klasöründe `pnpm install --frozen-lockfile` çalıştırın.
+
+Frontend testlerinde API cevapları taklit edilir. Testler için backend veya PostgreSQL açık olmak zorunda değildir; gerçek tarayıcı ve servis bağlantısı aşağıdaki ekran kontrolleriyle ayrıca doğrulanmalıdır.
 
 ## Derleme ve lint
 
@@ -260,7 +268,7 @@ Bu kontroller gerçek servisler ve veritabanıyla yapılır. Frontend build/lint
 
 `workforce_user.team_id` nullable bir foreign key'dir. Bir personel en fazla bir ekibe bağlıdır; bir ekip birden fazla personel içerir. Atanmamış personelde `teamId` ve `team` null döner. Ekipten çıkarmak personel kaydını silmez.
 
-Bu sürümde `1793750400000-AddWorkforceUserTeam.ts` migration'ı eklendi. Eski migration'lar değiştirilmedi. Workforce service başladığında bekleyen migration otomatik çalışır. Mevcut tablonuzu silmeyin ve aynı değişiklik için tekrar migration üretmeyin.
+Bu sürümde `1793777421380-AddWorkforceUserTeam.ts` migration'ı eklendi. Eski migration'lar değiştirilmedi. Workforce service başladığında bekleyen migration otomatik çalışır. Mevcut tablonuzu silmeyin ve aynı değişiklik için tekrar migration üretmeyin.
 
 İki servis açıkken Swagger'daki Teams bölümünden şu işlemleri deneyin. Adreslerde ve body'de kendi kayıtlarınızın gerçek ID değerlerini kullanın:
 
@@ -287,7 +295,20 @@ Atanacak ekip ID değeri URL'den alınır. `teamId`, personel oluşturma/güncel
 - GET `/api/teams/:id` cevabı `members` dizisini içerir; üye yoksa dizi boştur.
 - GET `/api/workforce-users` ve GET `/api/workforce-users/:id` cevaplarında her personelde `teamId` ile `team: { id, name }` veya `team: null` bulunur.
 
-Task 19 backend kapsamındadır. Üyelik endpoint'leri Swagger'dan kullanılabilir; web ekranında atama/çıkarma arayüzü bu görevde eklenmedi.
+Task 19 backend üyelik işlemlerini sağlar. Task 20 ile bu endpoint'leri kullanan ekip üyeleri arayüzü eklendi.
+
+## Ekip üyelerini ekrandan yönetme (Task 20)
+
+Ekip listesinden bir ekibin detayını açın. **Üyeler** tablosu sicil numarası, ad soyad ve telefonu gösterir. Sicil bağlantısı personel detayını açar. Telefon diğer ekranlarla aynı biçimde gösterilir.
+
+- **Üye Ekle:** Ad, soyad veya sicille arama yapılabilen modal açılır. Personeller sunucudan sayfalı alınır; arama 400 ms bekleyerek gönderilir. Aktif ve atanmamış bir personeli seçip Ekle ile kaydedin.
+- **Seçim kısıtları:** Başka ekipteki personelin ekip adı etiket olarak görünür ve seçim kapalıdır. Mevcut üyeler ile pasif personeller de seçilemez.
+- **Pasif ekip:** Üye Ekle butonu devre dışıdır. Üzerine gelince nedenini açıklayan mesaj görünür. Task 19 kuralları gereği pasif ekipte veya pasif personelde çıkarma da kapalıdır.
+- **Çıkar:** Üyenin satırındaki Çıkar butonu onay ister. Vazgeçmek isteği göndermez. Onaydan sonra yalnızca üyelik kaldırılır, personel kaydı korunur.
+- **Güncel veriler:** Başarılı ekleme/çıkarma ekip üyelerini ve personel sorgularını yeniler; sayfayı elle yenilemek gerekmez. Personel listesindeki Ekip kolonu ekip adına ve detay bağlantısına, atanmamış kayıtlarda ise çizgiye yer verir.
+- **Eşzamanlı değişiklik:** Backend 404/409 döndürürse güncel üyelik bilgileri yeniden alınır. Başka kullanıcının arada atadığı personel tekrar seçilemez; hata mesajı mevcut ortak HTTP istemcisinden gösterilir.
+
+Yerel kontrol: Bir personeli ekleyin, personel listesindeki ekip bilgisini kontrol edin, çıkarma onayından önce vazgeçin ve sonra onaylayın. Kayıt silinmeden ekip bilgisinin boşaldığını doğrulayın. Başka ekibe atanmış/pasif personelleri ve pasif ekibin buton açıklamasını da deneyin.
 
 ## Veritabanını inceleme
 

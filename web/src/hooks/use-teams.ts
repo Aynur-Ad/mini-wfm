@@ -8,8 +8,9 @@ import {
   updateTeam,
 } from "../api/teams.api";
 import type { CreateTeamDto, QueryTeamsParams, UpdateTeamDto } from "../types";
+import { TEAMS_QUERY_KEY, WORKFORCE_USERS_QUERY_KEY } from "./query-keys";
 
-export const TEAMS_QUERY_KEY = "teams";
+export { TEAMS_QUERY_KEY } from "./query-keys";
 
 // Ekip listesini okuma (Query)
 export function useTeams(params?: QueryTeamsParams) {
@@ -24,7 +25,7 @@ export function useTeam(id: number) {
   return useQuery({
     queryKey: [TEAMS_QUERY_KEY, id],
     queryFn: () => getTeamById(id),
-    enabled: Number.isFinite(id) && id > 0,
+    enabled: Number.isSafeInteger(id) && id > 0,
   });
 }
 
@@ -47,9 +48,14 @@ export function useUpdateTeam() {
   return useMutation({
     mutationFn: ({ id, payload }: { id: number; payload: UpdateTeamDto }) =>
       updateTeam(id, payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [TEAMS_QUERY_KEY] });
-    },
+    // Ekip adı personel listesi ve seçim modalında da görüntülenir.
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: [TEAMS_QUERY_KEY] }),
+        queryClient.invalidateQueries({
+          queryKey: [WORKFORCE_USERS_QUERY_KEY],
+        }),
+      ]),
   });
 }
 

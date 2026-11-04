@@ -190,6 +190,16 @@ export function WorkforceUsersPage() {
       render: (phone: string | null) => formatPhone(phone),
     },
     {
+      title: "Ekip",
+      key: "team",
+      render: (_value: unknown, person: WorkforceUser) =>
+        person.team ? (
+          <Link to={`/teams/${person.team.id}`}>{person.team.name}</Link>
+        ) : (
+          "—"
+        ),
+    },
+    {
       title: "Durum",
       key: "status",
       render: (_value: unknown, person: WorkforceUser) => (
@@ -295,7 +305,7 @@ export function WorkforceUsersPage() {
           dataSource={data?.data ?? []}
           loading={isFetching}
           locale={{ emptyText: "Kayıt bulunamadı" }}
-          scroll={{ x: 850 }}
+          scroll={{ x: 1000 }}
           pagination={{
             current: params.page,
             pageSize: params.limit,
