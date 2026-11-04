@@ -6,6 +6,7 @@ import { CreateTeamDto } from './dto/create-team.dto.js';
 import { QueryTeamsDto } from './dto/query-teams.dto.js';
 import { UpdateTeamDto } from './dto/update-team.dto.js';
 import { Team } from './entities/team.entity.js';
+import { WorkforceUser } from '../workforce_users/entities/workforce_user.entity.js';
 
 @Injectable()
 export class TeamsService {
@@ -26,7 +27,7 @@ export class TeamsService {
         statusCode: HttpStatus.CONFLICT, // 409
         message: 'Bu isimde bir ekip zaten var',
       });
-    } 
+    }
 
     // 3. Yoksa ekibi oluştur ve veritabanına kaydet
     const team = this.teamRepository.create({
@@ -81,6 +82,8 @@ export class TeamsService {
     // 1. ID ile ekibi veritabanında ara
     const team = await this.teamRepository.findOne({
       where: { id },
+      relations: { members: true },
+      order: { members: { id: 'ASC' } },
     });
 
     // 2. Yoksa GlobalExceptionFilter'ın beklediği formatta 404 fırlat
@@ -97,7 +100,15 @@ export class TeamsService {
 
   async update(id: number, updateTeamDto: UpdateTeamDto): Promise<Team> {
     // 1. Ekip var mı kontrol et (Yoksa findOne metodu 404 RpcException fırlatır)
-    const team = await this.findOne(id);
+    // Güncellemede üyeleri yükleyip save'e taşımayız; üyelik yalnızca kendi
+    // endpoint'leri üzerinden değiştirilir.
+    const team = await this.teamRepository.findOne({ where: { id } });
+    if (!team) {
+      throw new RpcException({
+        statusCode: HttpStatus.NOT_FOUND,
+        message: 'Ekip bulunamadı',
+      });
+    }
 
     // 2. Ad değiştiriliyorsa (name gönderilmiş ve mevcut addan farklıysa)
     if (updateTeamDto.name !== undefined && updateTeamDto.name !== team.name) {
@@ -130,12 +141,108 @@ export class TeamsService {
   }
 
   async remove(id: number): Promise<{ deleted: boolean; id: number }> {
-    // 1. Ekip var mı kontrol et (Yoksa findOne metodu 404 RpcException fırlatır)
-    const team = await this.findOne(id);
+    return this.teamRepository.manager.transaction(async (manager) => {
+      const teams = manager.getRepository(Team);
+      const people = manager.getRepository(WorkforceUser);
+      // Atama da önce aynı ekip satırını kilitler; kontrol ve silme arasına
+      // yeni üyelik giremez. Foreign key ayrıca veritabanında silmeyi sınırlar.
+      const team = await teams.findOne({
+        where: { id },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!team) {
+        throw new RpcException({
+          statusCode: HttpStatus.NOT_FOUND,
+          message: 'Ekip bulunamadı',
+        });
+      }
+      if (await people.existsBy({ teamId: id })) {
+        throw new RpcException({
+          statusCode: HttpStatus.CONFLICT,
+          message:
+            'Üyesi olan ekip silinemez. Önce personelleri ekipten çıkarın.',
+        });
+      }
+      await teams.remove(team);
+      return { deleted: true, id };
+    });
+  }
 
-    // 2. Varsa veritabanından sil
-    await this.teamRepository.remove(team);
+  async addMember(
+    teamId: number,
+    workforceUserId: number,
+  ): Promise<WorkforceUser> {
+    return this.changeMembership(teamId, workforceUserId, true);
+  }
 
-    return { deleted: true, id };
+  async removeMember(
+    teamId: number,
+    workforceUserId: number,
+  ): Promise<WorkforceUser> {
+    return this.changeMembership(teamId, workforceUserId, false);
+  }
+
+  private async changeMembership(
+    teamId: number,
+    workforceUserId: number,
+    assigning: boolean,
+  ): Promise<WorkforceUser> {
+    return this.teamRepository.manager.transaction(async (manager) => {
+      const teams = manager.getRepository(Team);
+      const people = manager.getRepository(WorkforceUser);
+      // Sıra tüm üyelik işlemlerinde aynıdır: önce ekip, sonra personel.
+      const team = await teams.findOne({
+        where: { id: teamId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!team) {
+        throw new RpcException({
+          statusCode: HttpStatus.NOT_FOUND,
+          message: 'Ekip bulunamadı',
+        });
+      }
+      const person = await people.findOne({
+        where: { id: workforceUserId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!person) {
+        throw new RpcException({
+          statusCode: HttpStatus.NOT_FOUND,
+          message: 'Personel bulunamadı.',
+        });
+      }
+      if (!team.isActive || !person.isActive) {
+        throw new RpcException({
+          statusCode: HttpStatus.CONFLICT,
+          message: 'Ekip ve personel aktif olmalıdır.',
+        });
+      }
+      if (assigning && person.teamId !== null) {
+        const currentTeam =
+          person.teamId === team.id
+            ? team
+            : await teams.findOne({
+                where: { id: person.teamId },
+                select: { id: true, name: true },
+              });
+        throw new RpcException({
+          statusCode: HttpStatus.CONFLICT,
+          message: `Personel zaten ${currentTeam?.name ?? `#${person.teamId}`} ekibine atanmış (ekip ID: ${person.teamId}).`,
+        });
+      }
+      if (!assigning && person.teamId !== team.id) {
+        throw new RpcException({
+          statusCode: HttpStatus.NOT_FOUND,
+          message: 'Personel bu ekibin üyesi değil.',
+        });
+      }
+      person.teamId = assigning ? team.id : null;
+      const saved = await people.save(person);
+      // Tüm ekibi ve üyelerini geri bağlamak döngüsel JSON oluştururdu.
+      saved.team = assigning
+        ? Object.assign(new Team(), { id: team.id, name: team.name })
+        : null;
+      return saved;
+    });
   }
 }

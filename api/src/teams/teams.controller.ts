@@ -3,6 +3,8 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Inject,
   Param,
   ParseIntPipe,
@@ -16,15 +18,19 @@ import {
   ApiConflictResponse,
   ApiCreatedResponse,
   ApiNotFoundResponse,
+  ApiNoContentResponse,
   ApiOkResponse,
   ApiOperation,
   ApiParam,
   ApiTags,
 } from '@nestjs/swagger';
-import { Observable } from 'rxjs';
+import { map, Observable } from 'rxjs';
 import { CreateTeamDto } from './dto/create-team.dto.js';
 import { QueryTeamsDto } from './dto/query-teams.dto.js';
 import { UpdateTeamDto } from './dto/update-team.dto.js';
+import { AddTeamMemberDto } from './dto/add-team-member.dto.js';
+import { TeamDetailResponseDto } from './dto/team-detail-response.dto.js';
+import { WorkforceUserResponseDto } from '../workforce_users/dto/workforce_user-response.dto.js';
 
 @ApiTags('Teams')
 @Controller('teams') // main.ts'deki setGlobalPrefix('api') sayesinde /api/teams olur
@@ -64,7 +70,10 @@ export class TeamsController {
     description: 'Ekibin sayısal ID değeri',
     example: 1,
   })
-  @ApiOkResponse({ description: 'Ekip detayı başarıyla getirildi' })
+  @ApiOkResponse({
+    description: 'Ekip detayı üyeleriyle birlikte getirildi',
+    type: TeamDetailResponseDto,
+  })
   @ApiBadRequestResponse({ description: 'Geçersiz ID formatı (sayı değil)' })
   @ApiNotFoundResponse({ description: 'Ekip bulunamadı' })
   findOne(@Param('id', ParseIntPipe) id: number): Observable<unknown> {
@@ -99,9 +108,55 @@ export class TeamsController {
     example: 1,
   })
   @ApiOkResponse({ description: 'Ekip başarıyla silindi' })
+  @ApiConflictResponse({ description: 'Üyesi olan ekip silinemez' })
   @ApiBadRequestResponse({ description: 'Geçersiz ID formatı (sayı değil)' })
   @ApiNotFoundResponse({ description: 'Ekip bulunamadı' })
   remove(@Param('id', ParseIntPipe) id: number): Observable<unknown> {
     return this.workforceClient.send('removeTeam', id);
+  }
+
+  @Post(':id/members')
+  @ApiOperation({ summary: 'Aktif personeli aktif bir ekibe atar' })
+  @ApiParam({ name: 'id', type: Number, example: 1 })
+  @ApiCreatedResponse({
+    description: 'Personel ekibe atandı',
+    type: WorkforceUserResponseDto,
+  })
+  @ApiBadRequestResponse({ description: 'Geçersiz ekip veya personel ID' })
+  @ApiNotFoundResponse({ description: 'Ekip veya personel bulunamadı' })
+  @ApiConflictResponse({
+    description:
+      'Ekip/personel pasif veya personel zaten bir ekibe atanmış; mevcut ekibin adı mesajda yer alır',
+  })
+  addMember(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: AddTeamMemberDto,
+  ): Observable<WorkforceUserResponseDto> {
+    return this.workforceClient.send('addTeamMember', {
+      teamId: id,
+      workforceUserId: dto.workforceUserId,
+    });
+  }
+
+  @Delete(':id/members/:workforceUserId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Personeli silmeden ekip üyeliğini kaldırır' })
+  @ApiParam({ name: 'id', type: Number, example: 1 })
+  @ApiParam({ name: 'workforceUserId', type: Number, example: 10 })
+  @ApiNoContentResponse({
+    description: 'Üyelik kaldırıldı; personel kaydı korunur',
+  })
+  @ApiBadRequestResponse({ description: 'Geçersiz ID formatı' })
+  @ApiNotFoundResponse({
+    description: 'Ekip/personel bulunamadı veya personel bu ekibin üyesi değil',
+  })
+  @ApiConflictResponse({ description: 'Ekip veya personel pasif' })
+  removeMember(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('workforceUserId', ParseIntPipe) workforceUserId: number,
+  ): Observable<void> {
+    return this.workforceClient
+      .send('removeTeamMember', { teamId: id, workforceUserId })
+      .pipe(map(() => undefined));
   }
 }

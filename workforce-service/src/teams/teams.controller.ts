@@ -4,6 +4,7 @@ import { TeamsService } from './teams.service.js';
 import { CreateTeamDto } from './dto/create-team.dto.js';
 import { QueryTeamsDto } from './dto/query-teams.dto.js';
 import { UpdateTeamDto } from './dto/update-team.dto.js';
+import { TeamMemberDto } from './dto/team-member.dto.js';
 
 @Controller()
 export class TeamsController {
@@ -32,5 +33,15 @@ export class TeamsController {
   @MessagePattern('removeTeam')
   remove(@Payload() id: number) {
     return this.teamsService.remove(id);
+  }
+
+  @MessagePattern('addTeamMember')
+  addMember(@Payload() dto: TeamMemberDto) {
+    return this.teamsService.addMember(dto.teamId, dto.workforceUserId);
+  }
+
+  @MessagePattern('removeTeamMember')
+  removeMember(@Payload() dto: TeamMemberDto) {
+    return this.teamsService.removeMember(dto.teamId, dto.workforceUserId);
   }
 }

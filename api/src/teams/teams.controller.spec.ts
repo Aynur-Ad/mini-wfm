@@ -94,4 +94,28 @@ describe('TeamsController (API)', () => {
 
     expect(mockWorkforceClient.send).toHaveBeenCalledWith('removeTeam', 1);
   });
+
+  it('atamada URL ekip ID değerini esas alır ve yalnızca personel ID değerini taşır', async () => {
+    const person = { id: 10, teamId: 1, team: { id: 1, name: 'Backend' } };
+    mockWorkforceClient.send.mockReturnValue(of(person));
+    const dto = Object.assign({ workforceUserId: 10 }, { teamId: 999 });
+    expect(await firstValueFrom(controller.addMember(1, dto))).toEqual(person);
+    expect(mockWorkforceClient.send).toHaveBeenCalledWith('addTeamMember', {
+      teamId: 1,
+      workforceUserId: 10,
+    });
+  });
+
+  it('üyelik kaldırmada iki ID değerini taşır ve HTTP için boş gövde üretir', async () => {
+    mockWorkforceClient.send.mockReturnValue(
+      of({ id: 10, teamId: null, team: null }),
+    );
+    expect(
+      await firstValueFrom(controller.removeMember(1, 10)),
+    ).toBeUndefined();
+    expect(mockWorkforceClient.send).toHaveBeenCalledWith('removeTeamMember', {
+      teamId: 1,
+      workforceUserId: 10,
+    });
+  });
 });
