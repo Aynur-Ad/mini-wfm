@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
+  Alert,
   Button,
   Input,
   Popconfirm,
@@ -51,7 +52,7 @@ export function TeamsPage() {
   const isActiveParam =
     statusFilter === "all" ? undefined : statusFilter === "active";
 
-  const { data, isFetching } = useTeams({
+  const { data, isFetching, isError, refetch } = useTeams({
     page,
     limit,
     search: debouncedSearch || undefined,
@@ -236,28 +237,47 @@ export function TeamsPage() {
         />
       </Space>
 
-      <Table<Team>
-        rowKey="id"
-        columns={columns}
-        dataSource={data?.data ?? []}
-        loading={isFetching}
-        locale={{ emptyText: "Kayıt bulunamadı" }}
-        pagination={{
-          current: page,
-          pageSize: limit,
-          total: data?.total ?? 0,
-          showSizeChanger: true,
-          pageSizeOptions: [10, 20, 50],
-          onChange: (newPage, newPageSize) => {
-            if (newPageSize !== limit) {
-              setLimit(newPageSize);
-              setPage(1);
-            } else {
-              setPage(newPage);
-            }
-          },
-        }}
-      />
+      {isError ? (
+        <Alert
+          type="error"
+          showIcon
+          title="Ekip listesi yüklenemedi"
+          description="Sunucu bağlantısını kontrol edip yeniden deneyin."
+          action={
+            <Button
+              loading={isFetching}
+              onClick={() => {
+                void refetch();
+              }}
+            >
+              Yeniden dene
+            </Button>
+          }
+        />
+      ) : (
+        <Table<Team>
+          rowKey="id"
+          columns={columns}
+          dataSource={data?.data ?? []}
+          loading={isFetching}
+          locale={{ emptyText: "Kayıt bulunamadı" }}
+          pagination={{
+            current: page,
+            pageSize: limit,
+            total: data?.total ?? 0,
+            showSizeChanger: true,
+            pageSizeOptions: [10, 20, 50],
+            onChange: (newPage, newPageSize) => {
+              if (newPageSize !== limit) {
+                setLimit(newPageSize);
+                setPage(1);
+              } else {
+                setPage(newPage);
+              }
+            },
+          }}
+        />
+      )}
 
       <TeamFormModal
         open={isModalOpen}

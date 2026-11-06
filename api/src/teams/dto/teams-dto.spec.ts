@@ -26,6 +26,21 @@ describe('Teams DTO Doğrulama Testleri', () => {
       expect(errors[0].property).toBe('name');
     });
 
+    it.each(['   ', '\t\n'])(
+      'yalnızca boşluktan oluşan %j ekip adını reddeder',
+      async (name) => {
+        const dto = plainToInstance(CreateTeamDto, { name });
+        const errors = await validate(dto);
+        expect(errors.some((error) => error.property === 'name')).toBe(true);
+      },
+    );
+
+    it('ekip adının başındaki ve sonundaki boşlukları temizler', async () => {
+      const dto = plainToInstance(CreateTeamDto, { name: '  Saha Ekibi  ' });
+      expect(await validate(dto)).toHaveLength(0);
+      expect(dto.name).toBe('Saha Ekibi');
+    });
+
     it('ekip adı 200 karakterden uzun olduğunda doğrulama hatası döner', async () => {
       const dto = plainToInstance(CreateTeamDto, {
         name: 'A'.repeat(201),
@@ -62,6 +77,24 @@ describe('Teams DTO Doğrulama Testleri', () => {
 
       const errors = await validate(dto);
       expect(errors.length).toBe(0);
+    });
+
+    it.each([
+      { field: 'name', input: { name: null } },
+      { field: 'name', input: { name: '   ' } },
+      { field: 'isActive', input: { isActive: null } },
+    ])(
+      '$field alanındaki geçersiz $input değerini reddeder',
+      async ({ field, input }) => {
+        const dto = plainToInstance(UpdateTeamDto, input);
+        const errors = await validate(dto);
+        expect(errors.some((error) => error.property === field)).toBe(true);
+      },
+    );
+
+    it('açıklamayı temizlemek için boş metin gönderilmesine izin verir', async () => {
+      const dto = plainToInstance(UpdateTeamDto, { description: '' });
+      expect(await validate(dto)).toHaveLength(0);
     });
 
     it('isActive alanına boolean yerine metin gönderildiğinde doğrulama hatası döner', async () => {
