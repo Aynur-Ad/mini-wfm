@@ -1,38 +1,33 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { of } from 'rxjs';
+import { Test } from '@nestjs/testing';
+import { firstValueFrom, of, throwError } from 'rxjs';
 import { vi } from 'vitest';
 import { AppController } from './app.controller.js';
+import { AppService } from './app.service.js';
 
 describe('AppController', () => {
-  let appController: AppController;
-
-  const mockWorkforceClient = {
-    send: vi.fn(),
-  };
+  let controller: AppController;
+  const service = { getHealth: vi.fn() };
 
   beforeEach(async () => {
-    vi.clearAllMocks();
-
-    const app: TestingModule = await Test.createTestingModule({
+    vi.resetAllMocks();
+    const module = await Test.createTestingModule({
       controllers: [AppController],
-      providers: [
-        {
-          provide: 'WORKFORCE_SERVICE',
-          useValue: mockWorkforceClient,
-        },
-      ],
+      providers: [{ provide: AppService, useValue: service }],
     }).compile();
-
-    appController = app.get<AppController>(AppController);
+    controller = module.get(AppController);
   });
 
-  describe('getHealth', () => {
-    it('workforce-service ping mesajını gönderir', () => {
-      mockWorkforceClient.send.mockReturnValue(of('pong'));
+  it('health isteğini service metoduna aktarır ve pong yanıtını döndürür', async () => {
+    service.getHealth.mockReturnValue(of('pong'));
+    expect(await firstValueFrom(controller.getHealth())).toBe('pong');
+    expect(service.getHealth).toHaveBeenCalledTimes(1);
+  });
 
-      appController.getHealth();
-
-      expect(mockWorkforceClient.send).toHaveBeenCalledWith('ping', {});
+  it('bağlantı hatasını başarı yanıtına dönüştürmeden filtreye bırakır', async () => {
+    const error = Object.assign(new Error('Bağlantı reddedildi'), {
+      code: 'ECONNREFUSED',
     });
+    service.getHealth.mockReturnValue(throwError(() => error));
+    await expect(firstValueFrom(controller.getHealth())).rejects.toBe(error);
   });
 });

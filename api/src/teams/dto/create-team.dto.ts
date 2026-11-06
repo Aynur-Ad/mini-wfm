@@ -1,3 +1,4 @@
+import { Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 
@@ -7,6 +8,9 @@ export class CreateTeamDto {
     example: 'Backend Geliştirme Ekibi',
     maxLength: 200,
   })
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
   @IsString({ message: 'Ekip adı metin (string) olmalıdır' })
   @IsNotEmpty({ message: 'Ekip adı boş bırakılamaz' })
   @MaxLength(200, { message: 'Ekip adı en fazla 200 karakter olabilir' })

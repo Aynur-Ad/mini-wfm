@@ -5,14 +5,12 @@ import {
   Get,
   HttpCode,
   HttpStatus,
-  Inject,
   Param,
   ParseIntPipe,
   Patch,
   Post,
   Query,
 } from '@nestjs/common';
-import { ClientProxy } from '@nestjs/microservices';
 import {
   ApiBadRequestResponse,
   ApiConflictResponse,
@@ -25,6 +23,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { map, Observable } from 'rxjs';
+import { TeamsService } from './teams.service.js';
 import { CreateTeamDto } from './dto/create-team.dto.js';
 import { QueryTeamsDto } from './dto/query-teams.dto.js';
 import { UpdateTeamDto } from './dto/update-team.dto.js';
@@ -35,9 +34,7 @@ import { WorkforceUserResponseDto } from '../workforce_users/dto/workforce_user-
 @ApiTags('Teams')
 @Controller('teams') // main.ts'deki setGlobalPrefix('api') sayesinde /api/teams olur
 export class TeamsController {
-  constructor(
-    @Inject('WORKFORCE_SERVICE') private readonly workforceClient: ClientProxy,
-  ) {}
+  constructor(private readonly teamsService: TeamsService) {}
 
   @Post()
   @ApiOperation({ summary: 'Yeni bir ekip oluşturur' })
@@ -47,7 +44,7 @@ export class TeamsController {
   })
   @ApiConflictResponse({ description: 'Bu isimde bir ekip zaten var' })
   create(@Body() createTeamDto: CreateTeamDto): Observable<unknown> {
-    return this.workforceClient.send('createTeam', createTeamDto);
+    return this.teamsService.create(createTeamDto);
   }
 
   @Get()
@@ -59,7 +56,7 @@ export class TeamsController {
     description: 'Geçersiz query parametresi (ör. page < 1 veya limit > 100)',
   })
   findAll(@Query() queryTeamsDto: QueryTeamsDto): Observable<unknown> {
-    return this.workforceClient.send('findAllTeams', queryTeamsDto);
+    return this.teamsService.findAll(queryTeamsDto);
   }
 
   @Get(':id')
@@ -77,7 +74,7 @@ export class TeamsController {
   @ApiBadRequestResponse({ description: 'Geçersiz ID formatı (sayı değil)' })
   @ApiNotFoundResponse({ description: 'Ekip bulunamadı' })
   findOne(@Param('id', ParseIntPipe) id: number): Observable<unknown> {
-    return this.workforceClient.send('findOneTeam', id);
+    return this.teamsService.findOne(id);
   }
 
   @Patch(':id')
@@ -96,10 +93,11 @@ export class TeamsController {
     @Param('id', ParseIntPipe) id: number,
     @Body() updateTeamDto: UpdateTeamDto,
   ): Observable<unknown> {
-    return this.workforceClient.send('updateTeam', { id, ...updateTeamDto });
+    return this.teamsService.update(id, updateTeamDto);
   }
 
   @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'ID bilgisine göre ekibi siler' })
   @ApiParam({
     name: 'id',
@@ -107,12 +105,14 @@ export class TeamsController {
     description: 'Silinecek ekibin sayısal ID değeri',
     example: 1,
   })
-  @ApiOkResponse({ description: 'Ekip başarıyla silindi' })
+  @ApiNoContentResponse({ description: 'Ekip başarıyla silindi' })
   @ApiConflictResponse({ description: 'Üyesi olan ekip silinemez' })
   @ApiBadRequestResponse({ description: 'Geçersiz ID formatı (sayı değil)' })
   @ApiNotFoundResponse({ description: 'Ekip bulunamadı' })
-  remove(@Param('id', ParseIntPipe) id: number): Observable<unknown> {
-    return this.workforceClient.send('removeTeam', id);
+  remove(@Param('id', ParseIntPipe) id: number): Observable<void> {
+    return this.teamsService
+      .remove(id)
+      .pipe(map(() => undefined));
   }
 
   @Post(':id/members')
@@ -132,10 +132,7 @@ export class TeamsController {
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: AddTeamMemberDto,
   ): Observable<WorkforceUserResponseDto> {
-    return this.workforceClient.send('addTeamMember', {
-      teamId: id,
-      workforceUserId: dto.workforceUserId,
-    });
+    return this.teamsService.addMember(id, dto.workforceUserId);
   }
 
   @Delete(':id/members/:workforceUserId')
@@ -155,8 +152,8 @@ export class TeamsController {
     @Param('id', ParseIntPipe) id: number,
     @Param('workforceUserId', ParseIntPipe) workforceUserId: number,
   ): Observable<void> {
-    return this.workforceClient
-      .send('removeTeamMember', { teamId: id, workforceUserId })
+    return this.teamsService
+      .removeMember(id, workforceUserId)
       .pipe(map(() => undefined));
   }
 }

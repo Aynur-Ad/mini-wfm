@@ -39,7 +39,7 @@ export function TeamFormModal({ open, team, onClose }: TeamFormModalProps) {
       const values = await form.validateFields();
       const payload: CreateTeamDto = {
         name: values.name.trim(),
-        description: values.description?.trim() || undefined,
+        description: values.description?.trim() || (isEditing ? "" : undefined),
       };
 
       // 2. Moduna göre ilgili mutation'ı çağır

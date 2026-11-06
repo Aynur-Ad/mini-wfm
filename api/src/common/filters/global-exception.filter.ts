@@ -9,6 +9,18 @@ import {
 
 import type { Response } from 'express';
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isErrorMessage(value: unknown): value is string | string[] {
+  return (
+    typeof value === 'string' ||
+    (Array.isArray(value) &&
+      value.every((item: unknown) => typeof item === 'string'))
+  );
+}
+
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(GlobalExceptionFilter.name);
@@ -20,7 +32,8 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     let statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
     let message: string | string[] = 'Beklenmeyen bir hata oluştu';
 
-    const err = exception as any;
+    const err = isRecord(exception) ? exception : undefined;
+    const nestedError = isRecord(err?.error) ? err.error : undefined;
 
     // workforce-service ulaşılamaz durumda mı? (ECONNREFUSED)
     if (
@@ -28,8 +41,9 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       err?.code === 'ECONNRESET' ||
       err?.code === 'EPIPE' ||
       err?.message === 'Connection closed' ||
-      err?.message?.includes?.('ECONNREFUSED') ||
-      err?.error?.code === 'ECONNREFUSED'
+      (typeof err?.message === 'string' &&
+        err.message.includes('ECONNREFUSED')) ||
+      nestedError?.code === 'ECONNREFUSED'
     ) {
       statusCode = HttpStatus.SERVICE_UNAVAILABLE; // 503
       message = 'Servise şu anda ulaşılamıyor';
@@ -39,18 +53,18 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     else if (
       err?.statusCode &&
       err?.message &&
+      isErrorMessage(err.message) &&
       !(exception instanceof HttpException)
     ) {
       statusCode = Number(err.statusCode);
       message = err.message;
     } else if (
-      err?.error &&
-      typeof err.error === 'object' &&
-      err.error.statusCode &&
-      err.error.message
+      nestedError?.statusCode &&
+      nestedError.message &&
+      isErrorMessage(nestedError.message)
     ) {
-      statusCode = Number(err.error.statusCode);
-      message = err.error.message;
+      statusCode = Number(nestedError.statusCode);
+      message = nestedError.message;
     }
     // 3. API servisinin kendi HttpException hataları (örn. 400 ValidationPipe, 401, 403 vb.)
     else if (exception instanceof HttpException) {
@@ -59,9 +73,12 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 
       if (typeof res == 'string') {
         message = res;
-      } else if (typeof res === 'object' && res !== null) {
+      } else if (isRecord(res)) {
         // NestJS varsayılan validation mesajları string array dönebilir.
-        message = (res as any).message || (res as any).error || message;
+        const responseMessage = res.message || res.error;
+        if (isErrorMessage(responseMessage)) {
+          message = responseMessage;
+        }
       }
     }
     // Diğer her şey (500 Internal Server Error)
@@ -69,7 +86,10 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       statusCode = HttpStatus.INTERNAL_SERVER_ERROR; // 500
       message = 'Beklenmeyen bir hata oluştu';
       // Hatanın detayını ve stack trace'ini NestJS Logger'ına basıyoruz (istemciye gitmez)
-      this.logger.error(`Beklenmeyen Hata: ${err?.message || err}`, err?.stack);
+      this.logger.error(
+        `Beklenmeyen Hata: ${String(err?.message || exception)}`,
+        typeof err?.stack === 'string' ? err.stack : undefined,
+      );
     }
 
     // P2 Hata Yanıt Biçimi ( stack trace yok)

@@ -82,6 +82,22 @@ describe('GlobalExceptionFilter', () => {
     });
   });
 
+  it('microservice hata mesajı liste olduğunda listeyi korur', () => {
+    filter.catch({ statusCode: 409, message: ['Sicil kullanılıyor'] }, host);
+    expect(response.json).toHaveBeenCalledWith({
+      statusCode: 409,
+      message: ['Sicil kullanılıyor'],
+    });
+  });
+
+  it('HTTP hata mesajı metin veya metin listesi değilse genel mesajı kullanır', () => {
+    filter.catch(new HttpException({ message: { field: 'name' } }, 400), host);
+    expect(response.json).toHaveBeenCalledWith({
+      statusCode: 400,
+      message: 'Beklenmeyen bir hata oluştu',
+    });
+  });
+
   it('beklenmeyen hatayı loglar, ayrıntısını istemciye sızdırmaz', () => {
     filter.catch(new Error('veritabanı iç ayrıntısı'), host);
     expect(response.status).toHaveBeenCalledWith(500);

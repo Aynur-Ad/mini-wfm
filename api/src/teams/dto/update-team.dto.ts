@@ -1,13 +1,15 @@
 import { ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { IsBoolean, IsOptional } from 'class-validator';
+import { IsBoolean, ValidateIf } from 'class-validator';
 import { CreateTeamDto } from './create-team.dto.js';
 
-export class UpdateTeamDto extends PartialType(CreateTeamDto) {
+export class UpdateTeamDto extends PartialType(CreateTeamDto, {
+  skipNullProperties: false,
+}) {
   @ApiPropertyOptional({
     description: 'Ekibin aktiflik durumu (pasife almak için false gönderilir)',
     example: true,
   })
-  @IsOptional()
+  @ValidateIf((_object: unknown, value: unknown) => value !== undefined)
   @IsBoolean({ message: 'Aktiflik durumu boolean (true/false) olmalıdır' })
   isActive?: boolean;
 }

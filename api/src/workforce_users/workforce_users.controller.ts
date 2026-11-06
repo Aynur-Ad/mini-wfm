@@ -5,14 +5,12 @@ import {
   Get,
   HttpCode,
   HttpStatus,
-  Inject,
   Param,
   ParseIntPipe,
   Patch,
   Post,
   Query,
 } from '@nestjs/common';
-import { ClientProxy } from '@nestjs/microservices';
 import {
   ApiBadRequestResponse,
   ApiConflictResponse,
@@ -25,6 +23,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { map, Observable } from 'rxjs';
+import { WorkforceUsersService } from './workforce_users.service.js';
 import { CreateWorkforceUserDto } from './dto/create-workforce_user.dto.js';
 import { QueryWorkforceUsersDto } from './dto/query-workforce_users.dto.js';
 import { UpdateWorkforceUserDto } from './dto/update-workforce_user.dto.js';
@@ -36,9 +35,7 @@ import {
 @ApiTags('Workforce_Users')
 @Controller('workforce-users')
 export class WorkforceUsersController {
-  constructor(
-    @Inject('WORKFORCE_SERVICE') private readonly workforceClient: ClientProxy,
-  ) {}
+  constructor(private readonly workforceUsersService: WorkforceUsersService) {}
 
   @Post()
   @ApiOperation({ summary: 'Yeni bir personel oluşturur' })
@@ -55,7 +52,7 @@ export class WorkforceUsersController {
   create(
     @Body() dto: CreateWorkforceUserDto,
   ): Observable<WorkforceUserResponseDto> {
-    return this.workforceClient.send('createWorkforceUser', dto);
+    return this.workforceUsersService.create(dto);
   }
 
   @Get()
@@ -72,7 +69,7 @@ export class WorkforceUsersController {
   findAll(
     @Query() query: QueryWorkforceUsersDto,
   ): Observable<WorkforceUsersPageDto> {
-    return this.workforceClient.send('findAllWorkforceUsers', query);
+    return this.workforceUsersService.findAll(query);
   }
 
   @Get(':id')
@@ -92,7 +89,7 @@ export class WorkforceUsersController {
   findOne(
     @Param('id', ParseIntPipe) id: number,
   ): Observable<WorkforceUserResponseDto> {
-    return this.workforceClient.send('findOneWorkforceUser', id);
+    return this.workforceUsersService.findOne(id);
   }
 
   @Patch(':id')
@@ -118,15 +115,7 @@ export class WorkforceUsersController {
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateWorkforceUserDto,
   ): Observable<WorkforceUserResponseDto> {
-    // Adresteki kimlik esastır; body içindeki yabancı alanlar kimliği değiştiremez.
-    return this.workforceClient.send('updateWorkforceUser', {
-      firstName: dto.firstName,
-      lastName: dto.lastName,
-      registrationNumber: dto.registrationNumber,
-      phone: dto.phone,
-      isActive: dto.isActive,
-      id,
-    });
+    return this.workforceUsersService.update(id, dto);
   }
 
   @Delete(':id')
@@ -145,8 +134,8 @@ export class WorkforceUsersController {
   @ApiNotFoundResponse({ description: 'Personel bulunamadı' })
   remove(@Param('id', ParseIntPipe) id: number): Observable<void> {
     // TCP silme yanıtını koruyup HTTP tarafında boş gövdeye çevirir.
-    return this.workforceClient
-      .send('removeWorkforceUser', id)
+    return this.workforceUsersService
+      .remove(id)
       .pipe(map(() => undefined));
   }
 }
