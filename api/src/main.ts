@@ -1,3 +1,5 @@
+import { ConfigService } from '@nestjs/config';
+import type { Environment } from './config/environment.js';
 import { NestFactory } from '@nestjs/core'; // nestjs çekirdek kütüphanesinden nestfactory sınıfını içe aktarır. Bu sınıf yeni bir nestjs uygulama instance oluşturmak için kullanılan bir fabrika sınıfı(factory pattern).
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -32,9 +34,10 @@ async function bootstrap() {
 
   // Global Exception Filter kaydı
   app.useGlobalFilters(new GlobalExceptionFilter());
-  
+
   // uygulamadan gelen ağ isteklerini hangi port üzerinden dinleyeceğini belirler ve dinlemeyi başlatır.
-  const port = process.env.PORT || 3000;
+  const settings = app.get(ConfigService<Environment, true>);
+  const port = settings.get('PORT', { infer: true });
   await app.listen(port);
   logger.log(`API running on http://localhost:${port}`);
   logger.log(`Swagger docs available at http://localhost:${port}/docs`);

@@ -1,19 +1,26 @@
 import { Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
-import { MicroserviceOptions, Transport } from '@nestjs/microservices';
+import type { MicroserviceOptions } from '@nestjs/microservices';
+import { Transport } from '@nestjs/microservices';
 import { AppModule } from './app.module.js';
+import type { Environment } from './config/environment.js';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
-  const app = await NestFactory.createMicroservice<MicroserviceOptions>(AppModule, {
+  // Önce Nest uygulaması hazırlanır; ConfigModule ayarları yükler ve doğrular.
+  const app = await NestFactory.create(AppModule);
+  const config = app.get(ConfigService<Environment, true>);
+  const host = config.get('WORKFORCE_HOST', { infer: true });
+  const port = config.get('WORKFORCE_PORT', { infer: true });
+
+  // app.listen çağrılmaz: dışarıya yalnızca TCP portu açılır.
+  app.connectMicroservice<MicroserviceOptions>({
     transport: Transport.TCP,
-    options: {
-      host: '127.0.0.1',
-      port: 4001,
-    },
+    options: { host, port },
   });
-  await app.listen();
-  logger.log('Workforce microservice is listening on TCP port 4001');
+  await app.startAllMicroservices();
+  logger.log(`Workforce microservice is listening on TCP ${host}:${port}`);
 }
 
 void bootstrap();

@@ -60,6 +60,7 @@ pnpm --dir web install --frozen-lockfile
 
 ```powershell
 Copy-Item workforce-service/.env.example workforce-service/.env
+Copy-Item api/.env.example api/.env
 ```
 
 Mevcut bir `.env` dosyanız varsa yeniden kopyalamak yerine içeriğini kontrol edin.
@@ -76,7 +77,7 @@ DB_PASSWORD=mysecretpassword
 
 Bu değerler depodaki **yerel geliştirme** Compose ayarlarıdır. Compose kullanıcı veya şifresini değiştirdiyseniz `.env` değerlerini de eşleştirin. `.env` Git'e eklenmez; `.env.example` depoda kalır.
 
-API veritabanına bağlanmadığından bu kurulum için `api/.env.example` dosyasını kopyalamak gerekmez.
+API veritabanına bağlanmaz. `api/.env`, PORT=3000, WORKFORCE_HOST=127.0.0.1 ve WORKFORCE_PORT=4001 ayarlarını içerir. API hedef portu ile servisin dinlediği port eşleşmelidir.
 
 ## 4. PostgreSQL'i başlatma
 
@@ -345,3 +346,35 @@ Volume silinmediği için veriler korunur.
 | Web açılıyor ama veriler gelmiyor | API ve workforce-service açık mı kontrol edin. Vite proxy hedefi varsayılan API portu 3000'dir. |
 | Swagger açılmıyor | API terminalindeki başlangıç hatalarını ve API portunu kontrol edin. |
 | vite-tsconfig-paths uyarısı | Test sonucundaki hata/başarı bölümünü kontrol edin; bu mesaj tek başına testlerin başarısız olduğunu göstermez. |
+
+## Task 22: Açılışta ayar doğrulaması
+
+İki uygulama `.env` dosyasını kendi çalışma klasöründen `ConfigModule` ile okur.
+`src/config/environment.ts` ayar şemasıdır. Eksik ayarlarda tanımlı varsayılanlar
+kullanılır; açıkça boş bırakılan değerler geçersizdir. Portlar 1–65535 arasında
+olmalı ve doğrulamadan sonra number olarak saklanmalıdır.
+
+| Uygulama | Ayar | Varsayılan / zorunluluk |
+| --- | --- | --- |
+| api | PORT | 3000 |
+| Her ikisi | WORKFORCE_HOST | 127.0.0.1 |
+| Her ikisi | WORKFORCE_PORT | 4001 |
+| workforce-service | DB_PORT | 5433 |
+| workforce-service | DB_HOST, DB_USER, DB_PASSWORD, DB_NAME | Zorunlu, boş olamaz |
+
+`ConfigService<Environment, true>` doğrulanmış değerleri tipli okur.
+`skipProcessEnv: true` okumaların doğrulanmış değerlerden yapılmasını sağlar.
+Veritabanı bağlantısı `forRootAsync` ile doğrulamadan sonra hazırlanır.
+`data-source.ts` yalnızca migration CLI için kalır; uygulama tarafından import edilmez.
+Migration komutlarında mevcut doğrudan dotenv okuma istisnası korunmuştur.
+
+Her uygulamanın kendi klasöründe `pnpm test`, `pnpm build`, `pnpm lint` çalıştırın.
+
+Elle kontrol için `.env` dosyanızı yedekleyin. Workforce-service dosyasından
+DB_PASSWORD satırını kaldırıp `pnpm start:dev` çalıştırın: uygulama açılmamalı,
+hatada DB_PASSWORD görünmeli. Ardından DB_PASSWORD değerini geri koyup DB_PORT=abc
+ile deneyin. Birkaç alanı birlikte bozduğunuzda tüm hatalar birlikte listelenmelidir.
+API için PORT=abc ile aynı denemeyi yapın. Sistem ortamında aynı adlı değişken
+varsa `.env` değerinden önce geldiğini unutmayın. Sonunda doğru değerleri geri yükleyin.
+Doğru ayarlarla PostgreSQL ve iki uygulamayı başlatın; `/api/health` pong dönmeli.
+API PORT değerini değiştirirseniz web uygulamasının Vite proxy hedefini de eşleştirin.
