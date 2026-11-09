@@ -191,6 +191,35 @@ pnpm --dir workforce-service test:cov
 
 Unit testlerin geçmesi, gerçek PostgreSQL bağlantısının ve migration'ların da çalıştığını tek başına doğrulamaz. Bunun için uygulamalar açıkken Swagger kontrolü yapın.
 
+### Entegrasyon testleri
+
+Workforce-service entegrasyon testleri, Testcontainers ile her test dosyası için geçici bir PostgreSQL container'ı açar ve mevcut migration'ları uygular. Testler `.env` veya geliştirme veritabanını kullanmaz. Her testten sonra iş tabloları temizlenir; dosya tamamlandığında bağlantı ve container kapatılır.
+
+Docker Desktop açık ve Linux container modunda olmalıdır. API, workforce-service ve Compose veritabanını çalıştırmak gerekmez. İlk çalıştırmada `postgres:16-alpine` image'ı ve Testcontainers'ın kaynak temizleme bileşeni indirilebilir.
+
+Proje kökünde:
+
+```powershell
+pnpm --dir workforce-service test:int
+```
+
+Normal `pnpm --dir workforce-service test` yalnızca unit testleri çalıştırır ve Docker gerektirmez. Entegrasyon testleri `src/test` altında `.int-spec.ts` uzantısıyla bulunur ve ayrı `vitest.config.int.ts` ayarıyla çalışır.
+
+Testler ekip adı tekilliğini, büyük/küçük harf duyarsız aramayı, sayfalama ve toplam kayıt sayısını, ekip üyeliği/silme kurallarını ve migration'ların geri alınıp tekrar uygulanmasını kontrol eder. Unit testlerden farklı olarak repository ve PostgreSQL bağlantısı gerçektir.
+
+Geliştirme veritabanından bağımsızlığı doğrulamak için uygulamaları durdurup `docker compose stop postgres` çalıştırın; ardından `test:int` komutunu tekrar çalıştırın. Compose verileri korunur. Normal geliştirmeye dönmek için `docker compose up -d` kullanın.
+
+Test sırasına bağımlılığı kontrol etmek için farklı seed değerleriyle çalıştırabilirsiniz:
+
+```powershell
+pnpm --dir workforce-service test:int --sequence.shuffle --sequence.seed=42
+pnpm --dir workforce-service test:int --sequence.shuffle --sequence.seed=73
+```
+
+`Could not find a working container runtime strategy` hatasında Docker Desktop'ın çalıştığını ve `docker info` komutunun başarılı olduğunu kontrol edin. Image indirme hatalarında ağ bağlantısını kontrol edin. Test veritabanının adresini `.env` dosyasına yazmayın.
+
+### Frontend testleri
+
 Frontend testleri **Vitest**, **JSDOM** ve **Testing Library** kullanır. Proje kökünde:
 
 ```powershell
