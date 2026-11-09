@@ -1,3 +1,4 @@
+import { requestContext } from '../logging/request-context.js';
 import {
   ArgumentsHost,
   BadRequestException,
@@ -9,7 +10,7 @@ import { GlobalExceptionFilter } from './global-exception.filter.js';
 
 describe('GlobalExceptionFilter', () => {
   let filter: GlobalExceptionFilter;
-  const logError = vi.fn(() => undefined);
+  const logError = vi.fn<(message: unknown) => void>();
   const response = { status: vi.fn(), json: vi.fn() };
   const host = {
     switchToHttp: () => ({ getResponse: () => response }),
@@ -106,5 +107,20 @@ describe('GlobalExceptionFilter', () => {
       message: 'Beklenmeyen bir hata oluştu',
     });
     expect(logError).toHaveBeenCalled();
+  });
+  it('500 logunda aynı kimlik bulunur, ham hata ve hassas değerler bulunmaz', () => {
+    requestContext.run({ correlationId: 'unexpected-23' }, () => {
+      filter.catch(
+        new Error('password=secret token=hidden phone=5321234567'),
+        host,
+      );
+    });
+    expect(JSON.parse(logError.mock.calls[0][0] as string)).toMatchObject({
+      correlationId: 'unexpected-23',
+      statusCode: 500,
+    });
+    expect(JSON.stringify(logError.mock.calls)).not.toMatch(
+      /secret|hidden|5321234567/,
+    );
   });
 });

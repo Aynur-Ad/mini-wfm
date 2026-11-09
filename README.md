@@ -197,7 +197,7 @@ Frontend testleri **Vitest**, **JSDOM** ve **Testing Library** kullanır. Proje 
 pnpm --dir web test
 ```
 
-İzleme modunda `pnpm --dir web test:watch` kullanın. Terminal zaten `web` klasöründeyse `pnpm test` veya `pnpm run test:watch` yeterlidir. Task 20 ile eklenen test bağımlılıklarını kurmak için güncel `package.json` ve `pnpm-lock.yaml` dosyalarını birlikte alın; `web` klasöründe `pnpm install --frozen-lockfile` çalıştırın.
+İzleme modunda `pnpm --dir web test:watch` kullanın. Terminal zaten `web` klasöründeyse `pnpm test` veya `pnpm run test:watch` yeterlidir. Test bağımlılıklarını kurmak için güncel `package.json` ve `pnpm-lock.yaml` dosyalarını birlikte alın; `web` klasöründe `pnpm install --frozen-lockfile` çalıştırın.
 
 Frontend testlerinde API cevapları taklit edilir. Testler için backend veya PostgreSQL açık olmak zorunda değildir; gerçek tarayıcı ve servis bağlantısı aşağıdaki ekran kontrolleriyle ayrıca doğrulanmalıdır.
 
@@ -219,7 +219,7 @@ pnpm --dir workforce-service lint
 pnpm --dir web lint
 ```
 
-Mevcut sürümde bazı ekip ve AppController dosyaları lint uyarıları verebilir. Komutun başarısız olmasına neden olan hatalar ile uyarıları ayrı değerlendirin.
+Lint çıktısındaki hata ve uyarıları kontrol edin; hataları giderdikten sonra komutu yeniden çalıştırın.
 
 ## Swagger üzerinden ilk kontrol
 
@@ -251,7 +251,7 @@ Beklenen davranışlar:
 - Liste sorgusunda `page`, `limit`, `search` ve `isActive` kullanılabilir. Arama ad, soyad veya sicilde yapılır. Varsayılan limit 10, en büyük limit 100'dür.
 - Personel silme: **204** ve boş gövde. Silinen kaydın detayı: **404**.
 
-## Personel ekranlarını kontrol etme (Task 18)
+## Personel ekranlarını kontrol etme
 
 Üç uygulama ve PostgreSQL açıkken web menüsünden **Personeller** sayfasına girin.
 
@@ -265,11 +265,11 @@ Beklenen davranışlar:
 
 Bu kontroller gerçek servisler ve veritabanıyla yapılır. Frontend build/lint kontrolü veya mock kullanılan testler tek başına bu uçtan uca kontrolün yerini tutmaz.
 
-## Personelin ekibe atanması (Task 19)
+## Personelin ekibe atanması
 
 `workforce_user.team_id` nullable bir foreign key'dir. Bir personel en fazla bir ekibe bağlıdır; bir ekip birden fazla personel içerir. Atanmamış personelde `teamId` ve `team` null döner. Ekipten çıkarmak personel kaydını silmez.
 
-Bu sürümde `1793777421380-AddWorkforceUserTeam.ts` migration'ı eklendi. Eski migration'lar değiştirilmedi. Workforce service başladığında bekleyen migration otomatik çalışır. Mevcut tablonuzu silmeyin ve aynı değişiklik için tekrar migration üretmeyin.
+Ekip üyeliği ilişkisi `1793777421380-AddWorkforceUserTeam.ts` migration'ıyla tanımlanır. Workforce service başladığında bekleyen migration otomatik çalışır. Mevcut tablonuzu silmeyin ve aynı değişiklik için tekrar migration üretmeyin.
 
 İki servis açıkken Swagger'daki Teams bölümünden şu işlemleri deneyin. Adreslerde ve body'de kendi kayıtlarınızın gerçek ID değerlerini kullanın:
 
@@ -286,7 +286,7 @@ POST body örneği:
 }
 ```
 
-Atanacak ekip ID değeri URL'den alınır. `teamId`, personel oluşturma/güncelleme DTO'suna eklenmedi; üyelik yalnızca yukarıdaki endpoint'lerle değiştirilir.
+Atanacak ekip ID değeri URL'den alınır. `teamId`, personel oluşturma/güncelleme DTO'sunda yer almaz; üyelik yalnızca yukarıdaki endpoint'lerle değiştirilir.
 
 - Ekip veya personel yoksa 404 döner.
 - Atama ve çıkarma için ekip ve personel aktif olmalıdır; pasif kayıtta 409 döner. Pasif bir üyenin çıkarılması gerekiyorsa önce ilgili kayıtları aktif hale getirin.
@@ -296,15 +296,15 @@ Atanacak ekip ID değeri URL'den alınır. `teamId`, personel oluşturma/güncel
 - GET `/api/teams/:id` cevabı `members` dizisini içerir; üye yoksa dizi boştur.
 - GET `/api/workforce-users` ve GET `/api/workforce-users/:id` cevaplarında her personelde `teamId` ile `team: { id, name }` veya `team: null` bulunur.
 
-Task 19 backend üyelik işlemlerini sağlar. Task 20 ile bu endpoint'leri kullanan ekip üyeleri arayüzü eklendi.
+Ekip üyeliği işlemleri, bu endpoint'leri kullanan ekip detay ekranından da yönetilebilir.
 
-## Ekip üyelerini ekrandan yönetme (Task 20)
+## Ekip üyelerini ekrandan yönetme
 
 Ekip listesinden bir ekibin detayını açın. **Üyeler** tablosu sicil numarası, ad soyad ve telefonu gösterir. Sicil bağlantısı personel detayını açar. Telefon diğer ekranlarla aynı biçimde gösterilir.
 
 - **Üye Ekle:** Ad, soyad veya sicille arama yapılabilen modal açılır. Personeller sunucudan sayfalı alınır; arama 400 ms bekleyerek gönderilir. Aktif ve atanmamış bir personeli seçip Ekle ile kaydedin.
 - **Seçim kısıtları:** Başka ekipteki personelin ekip adı etiket olarak görünür ve seçim kapalıdır. Mevcut üyeler ile pasif personeller de seçilemez.
-- **Pasif ekip:** Üye Ekle butonu devre dışıdır. Üzerine gelince nedenini açıklayan mesaj görünür. Task 19 kuralları gereği pasif ekipte veya pasif personelde çıkarma da kapalıdır.
+- **Pasif ekip:** Üye Ekle butonu devre dışıdır. Üzerine gelince nedenini açıklayan mesaj görünür. Üyelik kuralları gereği pasif ekipte veya pasif personelde çıkarma da kapalıdır.
 - **Çıkar:** Üyenin satırındaki Çıkar butonu onay ister. Vazgeçmek isteği göndermez. Onaydan sonra yalnızca üyelik kaldırılır, personel kaydı korunur.
 - **Güncel veriler:** Başarılı ekleme/çıkarma ekip üyelerini ve personel sorgularını yeniler; sayfayı elle yenilemek gerekmez. Personel listesindeki Ekip kolonu ekip adına ve detay bağlantısına, atanmamış kayıtlarda ise çizgiye yer verir.
 - **Eşzamanlı değişiklik:** Backend 404/409 döndürürse güncel üyelik bilgileri yeniden alınır. Başka kullanıcının arada atadığı personel tekrar seçilemez; hata mesajı mevcut ortak HTTP istemcisinden gösterilir.
@@ -346,35 +346,3 @@ Volume silinmediği için veriler korunur.
 | Web açılıyor ama veriler gelmiyor | API ve workforce-service açık mı kontrol edin. Vite proxy hedefi varsayılan API portu 3000'dir. |
 | Swagger açılmıyor | API terminalindeki başlangıç hatalarını ve API portunu kontrol edin. |
 | vite-tsconfig-paths uyarısı | Test sonucundaki hata/başarı bölümünü kontrol edin; bu mesaj tek başına testlerin başarısız olduğunu göstermez. |
-
-## Task 22: Açılışta ayar doğrulaması
-
-İki uygulama `.env` dosyasını kendi çalışma klasöründen `ConfigModule` ile okur.
-`src/config/environment.ts` ayar şemasıdır. Eksik ayarlarda tanımlı varsayılanlar
-kullanılır; açıkça boş bırakılan değerler geçersizdir. Portlar 1–65535 arasında
-olmalı ve doğrulamadan sonra number olarak saklanmalıdır.
-
-| Uygulama | Ayar | Varsayılan / zorunluluk |
-| --- | --- | --- |
-| api | PORT | 3000 |
-| Her ikisi | WORKFORCE_HOST | 127.0.0.1 |
-| Her ikisi | WORKFORCE_PORT | 4001 |
-| workforce-service | DB_PORT | 5433 |
-| workforce-service | DB_HOST, DB_USER, DB_PASSWORD, DB_NAME | Zorunlu, boş olamaz |
-
-`ConfigService<Environment, true>` doğrulanmış değerleri tipli okur.
-`skipProcessEnv: true` okumaların doğrulanmış değerlerden yapılmasını sağlar.
-Veritabanı bağlantısı `forRootAsync` ile doğrulamadan sonra hazırlanır.
-`data-source.ts` yalnızca migration CLI için kalır; uygulama tarafından import edilmez.
-Migration komutlarında mevcut doğrudan dotenv okuma istisnası korunmuştur.
-
-Her uygulamanın kendi klasöründe `pnpm test`, `pnpm build`, `pnpm lint` çalıştırın.
-
-Elle kontrol için `.env` dosyanızı yedekleyin. Workforce-service dosyasından
-DB_PASSWORD satırını kaldırıp `pnpm start:dev` çalıştırın: uygulama açılmamalı,
-hatada DB_PASSWORD görünmeli. Ardından DB_PASSWORD değerini geri koyup DB_PORT=abc
-ile deneyin. Birkaç alanı birlikte bozduğunuzda tüm hatalar birlikte listelenmelidir.
-API için PORT=abc ile aynı denemeyi yapın. Sistem ortamında aynı adlı değişken
-varsa `.env` değerinden önce geldiğini unutmayın. Sonunda doğru değerleri geri yükleyin.
-Doğru ayarlarla PostgreSQL ve iki uygulamayı başlatın; `/api/health` pong dönmeli.
-API PORT değerini değiştirirseniz web uygulamasının Vite proxy hedefini de eşleştirin.
