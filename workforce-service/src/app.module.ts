@@ -1,19 +1,24 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { dbConfig } from './data-source.js';
+import { validateEnvironment } from './config/environment.js';
+import { createDatabaseOptions } from './config/database.config.js';
 import { AppController } from './app.controller.js';
 import { TeamsModule } from './teams/teams.module.js';
 import { WorkforceUsersModule } from './workforce_users/workforce_users.module.js';
-
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
+      validate: validateEnvironment,
+      skipProcessEnv: true,
     }),
-    TypeOrmModule.forRoot(dbConfig),
+    TypeOrmModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: createDatabaseOptions,
+    }),
     TeamsModule,
     WorkforceUsersModule,
   ],

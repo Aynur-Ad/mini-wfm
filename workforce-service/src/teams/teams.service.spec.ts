@@ -21,16 +21,24 @@ describe('TeamsService', () => {
     manager: { transaction: vi.fn() },
   };
 
-  // Testlerde kullanacağımız örnek ekip verisi
-  const mockTeam: Team = {
-    id: 1,
-    members: [],
-    name: 'Backend Ekibi',
-    description: 'Mikroservis geliştirme ekibi',
-    isActive: true,
-    createdAt: new Date('2026-10-15T10:00:00Z'),
-    updatedAt: new Date('2026-10-15T10:00:00Z'),
-  };
+  // Her çağrıda bağımsız bir Team örneği oluşturur.
+  function createMockTeam(overrides: Partial<Team> = {}): Team {
+    return Object.assign(
+      new Team(),
+      {
+        id: 1,
+        members: [],
+        name: 'Backend Ekibi',
+        description: 'Mikroservis geliştirme ekibi',
+        isActive: true,
+        createdAt: new Date('2026-10-15T10:00:00Z'),
+        updatedAt: new Date('2026-10-15T10:00:00Z'),
+      },
+      overrides,
+    );
+  }
+
+  const mockTeam = createMockTeam();
 
   const people = { existsBy: vi.fn() };
 
@@ -172,12 +180,11 @@ describe('TeamsService', () => {
 
   describe('update', () => {
     it('yalnızca gönderilen alanları günceller ve kaydeder', async () => {
-      const existingTeam = { ...mockTeam };
-      const updatedTeam = {
-        ...mockTeam,
+      const existingTeam = createMockTeam();
+      const updatedTeam = createMockTeam({
         description: 'Yeni açıklama',
         isActive: false,
-      };
+      });
 
       mockTeamRepository.findOne.mockResolvedValue(existingTeam);
       mockTeamRepository.save.mockResolvedValue(updatedTeam);
@@ -199,7 +206,7 @@ describe('TeamsService', () => {
     });
 
     it('ekibin kendi adı tekrar gönderilirse 409 fırlatmadan günceller', async () => {
-      const existingTeam = { ...mockTeam };
+      const existingTeam = createMockTeam();
       mockTeamRepository.findOne.mockResolvedValueOnce(existingTeam);
       mockTeamRepository.save.mockResolvedValue(existingTeam);
 
@@ -229,8 +236,8 @@ describe('TeamsService', () => {
     });
 
     it('yeni ad başka bir ekipte varsa 409 fırlatır ve kaydetme çağrısı yapmaz', async () => {
-      const existingTeam = { ...mockTeam, id: 1, name: 'Backend Ekibi' };
-      const anotherTeam = { ...mockTeam, id: 2, name: 'Frontend Ekibi' };
+      const existingTeam = createMockTeam({ id: 1, name: 'Backend Ekibi' });
+      const anotherTeam = createMockTeam({ id: 2, name: 'Frontend Ekibi' });
 
       // İlk findOne ID ile arar (mevcut ekibi bulur), ikinci findOne isimle arar (başka ekibi bulur)
       mockTeamRepository.findOne

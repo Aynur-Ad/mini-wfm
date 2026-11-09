@@ -1,3 +1,6 @@
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { validateEnvironment } from './config/environment.js';
+import type { Environment } from './config/environment.js';
 import { Module } from '@nestjs/common'; // typescript/javascript sınıflarına modül davranışı ve metaverisi kazandırmak için kullanılan module'ü içe aktarır.
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { TeamsService } from './teams/teams.service.js';
@@ -11,14 +14,23 @@ import { WorkforceUsersController } from './workforce_users/workforce_users.cont
 @Module({
   // bu modülün ihtiyaç duyduğu diğer alt modülleri ekleyen dizi.
   imports: [
-    ClientsModule.register([
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: '.env',
+      validate: validateEnvironment,
+      skipProcessEnv: true,
+    }),
+    ClientsModule.registerAsync([
       {
         name: 'WORKFORCE_SERVICE',
-        transport: Transport.TCP,
-        options: {
-          host: '127.0.0.1',
-          port: 4001,
-        },
+        inject: [ConfigService],
+        useFactory: (config: ConfigService<Environment, true>) => ({
+          transport: Transport.TCP,
+          options: {
+            host: config.get('WORKFORCE_HOST', { infer: true }),
+            port: config.get('WORKFORCE_PORT', { infer: true }),
+          },
+        }),
       },
     ]),
   ],
