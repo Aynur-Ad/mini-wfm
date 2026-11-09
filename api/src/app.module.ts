@@ -1,3 +1,4 @@
+import { WorkforceClient } from './common/clients/workforce-client.js';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { validateEnvironment } from './config/environment.js';
 import type { Environment } from './config/environment.js';
@@ -22,7 +23,7 @@ import { WorkforceUsersController } from './workforce_users/workforce_users.cont
     }),
     ClientsModule.registerAsync([
       {
-        name: 'WORKFORCE_SERVICE',
+        name: 'WORKFORCE_TCP',
         inject: [ConfigService],
         useFactory: (config: ConfigService<Environment, true>) => ({
           transport: Transport.TCP,
@@ -35,6 +36,11 @@ import { WorkforceUsersController } from './workforce_users/workforce_users.cont
     ]),
   ],
   controllers: [AppController, TeamsController, WorkforceUsersController], // gelen http isteklerini karşılayıp yanıt dönecek denetleyicileri kaydeder.
-  providers: [AppService, TeamsService, WorkforceUsersService], // nestjsin bağımlılık enjeksiyonu mekanizmasına kaydedilecek sağlayıcıları tanımlar. Mesela burada appservice kaydedildiği için, appcontroller sınıfı constructer üzerinden appservice'i doğrudan talep edip kullanabilir.
+  providers: [
+    AppService,
+    TeamsService,
+    WorkforceUsersService,
+    { provide: 'WORKFORCE_SERVICE', useClass: WorkforceClient },
+  ], // nestjsin bağımlılık enjeksiyonu mekanizmasına kaydedilecek sağlayıcıları tanımlar. Mesela burada appservice kaydedildiği için, appcontroller sınıfı constructer üzerinden appservice'i doğrudan talep edip kullanabilir.
 })
 export class AppModule {} // modülün dışa aktarılmasını sağlar.

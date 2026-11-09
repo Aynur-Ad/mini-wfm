@@ -1,3 +1,4 @@
+import { requestContext } from '../logging/request-context.js';
 import {
   ArgumentsHost,
   Catch,
@@ -85,10 +86,15 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     else {
       statusCode = HttpStatus.INTERNAL_SERVER_ERROR; // 500
       message = 'Beklenmeyen bir hata oluştu';
-      // Hatanın detayını ve stack trace'ini NestJS Logger'ına basıyoruz (istemciye gitmez)
+      // Ham hata mesajı/stack hassas değerler içerebilir; yalnızca güvenli metadata loglanır.
       this.logger.error(
-        `Beklenmeyen Hata: ${String(err?.message || exception)}`,
-        typeof err?.stack === 'string' ? err.stack : undefined,
+        JSON.stringify({
+          correlationId: requestContext.getStore()?.correlationId ?? 'system',
+          statusCode,
+          errorType:
+            exception instanceof Error ? exception.name : 'UnknownError',
+          message: 'Beklenmeyen hata',
+        }),
       );
     }
 

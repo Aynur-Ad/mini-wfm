@@ -1,3 +1,4 @@
+import { DatabaseLogger } from '../common/logging/database-logger.js';
 import type { ConfigService } from '@nestjs/config';
 import type { TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
@@ -11,6 +12,7 @@ export function createDatabaseOptions(
   const sourceDir = fileURLToPath(new URL('../', import.meta.url));
   return {
     type: 'postgres',
+    logger: new DatabaseLogger(),
     host: config.get('DB_HOST', { infer: true }),
     port: config.get('DB_PORT', { infer: true }),
     username: config.get('DB_USER', { infer: true }),

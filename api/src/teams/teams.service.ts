@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { ClientProxy } from '@nestjs/microservices';
+import { WorkforceClient } from '../common/clients/workforce-client.js';
 import { Observable } from 'rxjs';
 import { CreateTeamDto } from './dto/create-team.dto.js';
 import { QueryTeamsDto } from './dto/query-teams.dto.js';
@@ -9,7 +9,8 @@ import { WorkforceUserResponseDto } from '../workforce_users/dto/workforce_user-
 @Injectable()
 export class TeamsService {
   constructor(
-    @Inject('WORKFORCE_SERVICE') private readonly workforceClient: ClientProxy,
+    @Inject('WORKFORCE_SERVICE')
+    private readonly workforceClient: WorkforceClient,
   ) {}
 
   create(dto: CreateTeamDto): Observable<unknown> {

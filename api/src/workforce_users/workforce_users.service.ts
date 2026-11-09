@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { ClientProxy } from '@nestjs/microservices';
+import { WorkforceClient } from '../common/clients/workforce-client.js';
 import { Observable } from 'rxjs';
 import { CreateWorkforceUserDto } from './dto/create-workforce_user.dto.js';
 import { QueryWorkforceUsersDto } from './dto/query-workforce_users.dto.js';
@@ -12,7 +12,8 @@ import {
 @Injectable()
 export class WorkforceUsersService {
   constructor(
-    @Inject('WORKFORCE_SERVICE') private readonly workforceClient: ClientProxy,
+    @Inject('WORKFORCE_SERVICE')
+    private readonly workforceClient: WorkforceClient,
   ) {}
 
   create(dto: CreateWorkforceUserDto): Observable<WorkforceUserResponseDto> {

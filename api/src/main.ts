@@ -1,3 +1,5 @@
+import { CorrelationLogger } from './common/logging/correlation-logger.js';
+import { HttpLoggingInterceptor } from './common/interceptors/http-logging.interceptor.js';
 import { ConfigService } from '@nestjs/config';
 import type { Environment } from './config/environment.js';
 import { NestFactory } from '@nestjs/core'; // nestjs çekirdek kütüphanesinden nestfactory sınıfını içe aktarır. Bu sınıf yeni bir nestjs uygulama instance oluşturmak için kullanılan bir fabrika sınıfı(factory pattern).
@@ -9,7 +11,13 @@ import { AppModule } from './app.module.js'; // projenin ana modülünü içe ak
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
   // uygulamanın başlatma mantığını barındıran asenkron bir fonksiyon tanımlar.
-  const app = await NestFactory.create(AppModule); // ana modülü fonksiyona parametre vererek uygulamayı bellekte hazırlar.
+  const app = await NestFactory.create(AppModule, {
+    logger: new CorrelationLogger(),
+  }); // ana modülü fonksiyona parametre vererek uygulamayı bellekte hazırlar.
+
+  const requestLogging = new HttpLoggingInterceptor();
+  app.use(requestLogging.middleware());
+  app.useGlobalInterceptors(requestLogging);
 
   // Tüm endpointler /api önekiyle başlasın
   app.setGlobalPrefix('api');
