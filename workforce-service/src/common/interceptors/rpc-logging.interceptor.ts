@@ -1,3 +1,4 @@
+import { readActor } from '../logging/actor.js';
 import { Injectable, Logger } from '@nestjs/common';
 import type {
   CallHandler,
@@ -14,6 +15,7 @@ import {
 // B10: mesaj tipi her projede ayrı tutulur; ortak kütüphane oluşturulmaz.
 interface CorrelatedMessage {
   correlationId: string;
+  actor?: unknown;
   data: unknown;
 }
 
@@ -36,6 +38,7 @@ export class RpcLoggingInterceptor implements NestInterceptor {
     const envelope = isCorrelatedMessage(payload) ? payload : undefined;
     const state = {
       correlationId: resolveCorrelationId(envelope?.correlationId),
+      actor: readActor(envelope?.actor),
     };
     // Controller ve iş kuralları orijinal DTO/id'yi alır; zarfı bilmeleri gerekmez.
     if (envelope) context.getArgs<unknown[]>()[0] = envelope.data;
@@ -48,6 +51,7 @@ export class RpcLoggingInterceptor implements NestInterceptor {
             correlationId: state.correlationId,
             handler,
             phase: 'received',
+            actorId: state.actor?.id ?? null,
           }),
         );
         return next

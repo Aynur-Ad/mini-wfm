@@ -1,3 +1,4 @@
+import type { AuthUser } from '../../auth/auth-user.js';
 import { Inject, Injectable } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import type { Observable } from 'rxjs';
@@ -8,6 +9,7 @@ import {
 
 export interface CorrelatedMessage<T> {
   correlationId: string;
+  actor: AuthUser | null;
   data: T;
 }
 
@@ -20,6 +22,7 @@ export class WorkforceClient {
       correlationId: resolveCorrelationId(
         requestContext.getStore()?.correlationId,
       ),
+      actor: requestContext.getStore()?.actor ?? null,
       data,
     };
     // Kimlik burada, tek yerde eklenir. Service'ler iş verisini eskisi gibi gönderir.

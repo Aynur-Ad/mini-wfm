@@ -1,3 +1,4 @@
+import { AccountRole } from '../../accounts/account-role.js';
 import { Logger } from '@nestjs/common';
 import type { ExecutionContext } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
@@ -76,5 +77,25 @@ describe('RpcLoggingInterceptor', () => {
       }),
     );
     expect(args[0]).toBe(5);
+  });
+  it('actor’ı kapsamda tutar; token ve fazladan alanları actor’a almaz', async () => {
+    vi.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
+    const actor = { id: 7, username: 'ali', role: AccountRole.PLANNER };
+    const { context, args } = fixture({
+      correlationId: 'actor-request',
+      actor: { ...actor, token: 'private-token' },
+      data: 5,
+    });
+    await firstValueFrom(
+      new RpcLoggingInterceptor().intercept(context, {
+        handle: () =>
+          defer(() => {
+            expect(requestContext.getStore()?.actor).toEqual(actor);
+            expect(args[0]).toBe(5);
+            return of('ok');
+          }),
+      }),
+    );
+    expect(requestContext.getStore()).toBeUndefined();
   });
 });

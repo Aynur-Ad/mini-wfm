@@ -1,3 +1,4 @@
+import type { RequestContext } from '../logging/request-context.js';
 import { Injectable, Logger } from '@nestjs/common';
 import type {
   CallHandler,
@@ -12,8 +13,7 @@ import {
   resolveCorrelationId,
 } from '../logging/request-context.js';
 
-interface HttpTrace {
-  correlationId: string;
+interface HttpTrace extends RequestContext {
   startedAt: number;
 }
 
@@ -50,6 +50,7 @@ export class HttpLoggingInterceptor implements NestInterceptor {
     let trace = this.traces.get(request);
     if (!trace) {
       trace = {
+        actor: null,
         correlationId: resolveCorrelationId(
           request.headers['x-correlation-id'],
         ),

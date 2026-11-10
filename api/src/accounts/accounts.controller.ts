@@ -1,3 +1,4 @@
+import { ApiBearerAuth } from '@nestjs/swagger';
 import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
@@ -16,6 +17,7 @@ import {
 } from './dto/account-response.dto.js';
 
 @ApiTags('Accounts')
+@ApiBearerAuth('access-token')
 @Controller('accounts')
 export class AccountsController {
   constructor(private readonly accounts: AccountsService) {}

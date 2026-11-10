@@ -1,3 +1,4 @@
+import { ApiBearerAuth } from '@nestjs/swagger';
 import {
   Body,
   Controller,
@@ -32,6 +33,7 @@ import { TeamDetailResponseDto } from './dto/team-detail-response.dto.js';
 import { WorkforceUserResponseDto } from '../workforce_users/dto/workforce_user-response.dto.js';
 
 @ApiTags('Teams')
+@ApiBearerAuth('access-token')
 @Controller('teams') // main.ts'deki setGlobalPrefix('api') sayesinde /api/teams olur
 export class TeamsController {
   constructor(private readonly teamsService: TeamsService) {}
@@ -110,9 +112,7 @@ export class TeamsController {
   @ApiBadRequestResponse({ description: 'Geçersiz ID formatı (sayı değil)' })
   @ApiNotFoundResponse({ description: 'Ekip bulunamadı' })
   remove(@Param('id', ParseIntPipe) id: number): Observable<void> {
-    return this.teamsService
-      .remove(id)
-      .pipe(map(() => undefined));
+    return this.teamsService.remove(id).pipe(map(() => undefined));
   }
 
   @Post(':id/members')

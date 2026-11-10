@@ -1,3 +1,12 @@
+import { APP_GUARD } from '@nestjs/core';
+import { JwtModule } from '@nestjs/jwt';
+import { AuthController } from './auth/auth.controller.js';
+import { AuthService } from './auth/auth.service.js';
+import { JwtGuard } from './common/guards/jwt.guard.js';
+import {
+  ACCESS_TOKEN_TTL_SECONDS,
+  JWT_ALGORITHM,
+} from './auth/auth.constants.js';
 import { AccountsController } from './accounts/accounts.controller.js';
 import { AccountsService } from './accounts/accounts.service.js';
 import { WorkforceClient } from './common/clients/workforce-client.js';
@@ -23,6 +32,17 @@ import { WorkforceUsersController } from './workforce_users/workforce_users.cont
       validate: validateEnvironment,
       skipProcessEnv: true,
     }),
+    JwtModule.registerAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService<Environment, true>) => ({
+        secret: config.get('JWT_SECRET', { infer: true }),
+        signOptions: {
+          expiresIn: ACCESS_TOKEN_TTL_SECONDS,
+          algorithm: JWT_ALGORITHM,
+        },
+        verifyOptions: { algorithms: [JWT_ALGORITHM] },
+      }),
+    }),
     ClientsModule.registerAsync([
       {
         name: 'WORKFORCE_TCP',
@@ -38,12 +58,15 @@ import { WorkforceUsersController } from './workforce_users/workforce_users.cont
     ]),
   ],
   controllers: [
+    AuthController,
     AppController,
     TeamsController,
     WorkforceUsersController,
     AccountsController,
   ], // gelen http isteklerini karşılayıp yanıt dönecek denetleyicileri kaydeder.
   providers: [
+    AuthService,
+    { provide: APP_GUARD, useClass: JwtGuard },
     AccountsService,
     AppService,
     TeamsService,

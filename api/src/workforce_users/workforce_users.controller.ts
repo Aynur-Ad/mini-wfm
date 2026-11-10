@@ -1,3 +1,4 @@
+import { ApiBearerAuth } from '@nestjs/swagger';
 import {
   Body,
   Controller,
@@ -33,6 +34,7 @@ import {
 } from './dto/workforce_user-response.dto.js';
 
 @ApiTags('Workforce_Users')
+@ApiBearerAuth('access-token')
 @Controller('workforce-users')
 export class WorkforceUsersController {
   constructor(private readonly workforceUsersService: WorkforceUsersService) {}
@@ -134,8 +136,6 @@ export class WorkforceUsersController {
   @ApiNotFoundResponse({ description: 'Personel bulunamadı' })
   remove(@Param('id', ParseIntPipe) id: number): Observable<void> {
     // TCP silme yanıtını koruyup HTTP tarafında boş gövdeye çevirir.
-    return this.workforceUsersService
-      .remove(id)
-      .pipe(map(() => undefined));
+    return this.workforceUsersService.remove(id).pipe(map(() => undefined));
   }
 }
