@@ -1,3 +1,5 @@
+import { Roles } from '../common/decorators/roles.decorator.js';
+import { AccountRole } from '../accounts/account-role.js';
 import {
   Body,
   Controller,
@@ -30,7 +32,10 @@ export class AuthController {
   @Public()
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Giriş yapar ve 8 saatlik erişim token’ı verir' })
+  @ApiOperation({
+    summary: 'Giriş yapar ve 8 saatlik erişim token’ı verir',
+    description: 'Herkese açık; token gerekmez.',
+  })
   @ApiOkResponse({ type: LoginResponseDto })
   @ApiBadRequestResponse({ description: 'İstek gövdesi geçersiz' })
   @ApiUnauthorizedResponse({ description: 'Kullanıcı adı veya şifre hatalı' })
@@ -42,8 +47,12 @@ export class AuthController {
   }
 
   @Get('me')
+  @Roles(AccountRole.ADMIN, AccountRole.PLANNER, AccountRole.VIEWER)
   @ApiBearerAuth('access-token')
-  @ApiOperation({ summary: 'Token sahibinin kimliğini döndürür' })
+  @ApiOperation({
+    summary: 'Token sahibinin kimliğini döndürür',
+    description: 'İzin verilen roller: ADMIN, PLANNER, VIEWER.',
+  })
   @ApiOkResponse({ type: AuthUserDto })
   @ApiUnauthorizedResponse({
     description: 'Token yok, geçersiz veya süresi dolmuş',

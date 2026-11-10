@@ -1,4 +1,10 @@
-import { ApiBearerAuth } from '@nestjs/swagger';
+import { Roles } from '../common/decorators/roles.decorator.js';
+import { AccountRole } from '../accounts/account-role.js';
+import {
+  ApiForbiddenResponse,
+  ApiUnauthorizedResponse,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import {
   Body,
   Controller,
@@ -35,12 +41,20 @@ import {
 
 @ApiTags('Workforce_Users')
 @ApiBearerAuth('access-token')
+@ApiUnauthorizedResponse({
+  description: 'Token yok, geçersiz veya süresi dolmuş',
+})
+@ApiForbiddenResponse({ description: 'Bu işlem için yetkiniz yok' })
 @Controller('workforce-users')
 export class WorkforceUsersController {
   constructor(private readonly workforceUsersService: WorkforceUsersService) {}
 
   @Post()
-  @ApiOperation({ summary: 'Yeni bir personel oluşturur' })
+  @Roles(AccountRole.ADMIN)
+  @ApiOperation({
+    summary: 'Yeni bir personel oluşturur',
+    description: 'İzin verilen roller: ADMIN.',
+  })
   @ApiCreatedResponse({
     description: 'Personel başarıyla oluşturuldu',
     type: WorkforceUserResponseDto,
@@ -58,8 +72,10 @@ export class WorkforceUsersController {
   }
 
   @Get()
+  @Roles(AccountRole.ADMIN, AccountRole.PLANNER, AccountRole.VIEWER)
   @ApiOperation({
     summary: 'Personelleri sayfalı, aranabilir ve filtrelenebilir listeler',
+    description: 'İzin verilen roller: ADMIN, PLANNER, VIEWER.',
   })
   @ApiOkResponse({
     description: 'Personel listesi',
@@ -75,7 +91,11 @@ export class WorkforceUsersController {
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'ID bilgisine göre personel detayını getirir' })
+  @Roles(AccountRole.ADMIN, AccountRole.PLANNER, AccountRole.VIEWER)
+  @ApiOperation({
+    summary: 'ID bilgisine göre personel detayını getirir',
+    description: 'İzin verilen roller: ADMIN, PLANNER, VIEWER.',
+  })
   @ApiParam({
     name: 'id',
     type: Number,
@@ -95,8 +115,10 @@ export class WorkforceUsersController {
   }
 
   @Patch(':id')
+  @Roles(AccountRole.ADMIN)
   @ApiOperation({
     summary: 'Personelin yalnızca gönderilen alanlarını günceller',
+    description: 'İzin verilen roller: ADMIN.',
   })
   @ApiParam({
     name: 'id',
@@ -121,8 +143,12 @@ export class WorkforceUsersController {
   }
 
   @Delete(':id')
+  @Roles(AccountRole.ADMIN)
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Personeli kalıcı olarak siler' })
+  @ApiOperation({
+    summary: 'Personeli kalıcı olarak siler',
+    description: 'İzin verilen roller: ADMIN.',
+  })
   @ApiParam({
     name: 'id',
     type: Number,

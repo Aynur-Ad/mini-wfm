@@ -1,4 +1,10 @@
-import { ApiBearerAuth } from '@nestjs/swagger';
+import { Roles } from '../common/decorators/roles.decorator.js';
+import { AccountRole } from '../accounts/account-role.js';
+import {
+  ApiForbiddenResponse,
+  ApiUnauthorizedResponse,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import {
   Body,
   Controller,
@@ -34,12 +40,20 @@ import { WorkforceUserResponseDto } from '../workforce_users/dto/workforce_user-
 
 @ApiTags('Teams')
 @ApiBearerAuth('access-token')
+@ApiUnauthorizedResponse({
+  description: 'Token yok, geçersiz veya süresi dolmuş',
+})
+@ApiForbiddenResponse({ description: 'Bu işlem için yetkiniz yok' })
 @Controller('teams') // main.ts'deki setGlobalPrefix('api') sayesinde /api/teams olur
 export class TeamsController {
   constructor(private readonly teamsService: TeamsService) {}
 
   @Post()
-  @ApiOperation({ summary: 'Yeni bir ekip oluşturur' })
+  @Roles(AccountRole.ADMIN)
+  @ApiOperation({
+    summary: 'Yeni bir ekip oluşturur',
+    description: 'İzin verilen roller: ADMIN.',
+  })
   @ApiCreatedResponse({ description: 'Ekip başarıyla oluşturuldu' })
   @ApiBadRequestResponse({
     description: 'Doğrulama hatası (name boş veya 200 karakterden uzun)',
@@ -50,8 +64,10 @@ export class TeamsController {
   }
 
   @Get()
+  @Roles(AccountRole.ADMIN, AccountRole.PLANNER, AccountRole.VIEWER)
   @ApiOperation({
     summary: 'Ekipleri sayfalı, aranabilir ve filtrelenebilir şekilde listeler',
+    description: 'İzin verilen roller: ADMIN, PLANNER, VIEWER.',
   })
   @ApiOkResponse({ description: 'Ekip listesi başarıyla getirildi' })
   @ApiBadRequestResponse({
@@ -62,7 +78,11 @@ export class TeamsController {
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'ID bilgisine göre ekip detayını getirir' })
+  @Roles(AccountRole.ADMIN, AccountRole.PLANNER, AccountRole.VIEWER)
+  @ApiOperation({
+    summary: 'ID bilgisine göre ekip detayını getirir',
+    description: 'İzin verilen roller: ADMIN, PLANNER, VIEWER.',
+  })
   @ApiParam({
     name: 'id',
     type: Number,
@@ -80,7 +100,11 @@ export class TeamsController {
   }
 
   @Patch(':id')
-  @ApiOperation({ summary: 'Mevcut bir ekibi kısmi olarak günceller' })
+  @Roles(AccountRole.ADMIN)
+  @ApiOperation({
+    summary: 'Mevcut bir ekibi kısmi olarak günceller',
+    description: 'İzin verilen roller: ADMIN.',
+  })
   @ApiParam({
     name: 'id',
     type: Number,
@@ -99,8 +123,12 @@ export class TeamsController {
   }
 
   @Delete(':id')
+  @Roles(AccountRole.ADMIN)
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'ID bilgisine göre ekibi siler' })
+  @ApiOperation({
+    summary: 'ID bilgisine göre ekibi siler',
+    description: 'İzin verilen roller: ADMIN.',
+  })
   @ApiParam({
     name: 'id',
     type: Number,
@@ -116,7 +144,11 @@ export class TeamsController {
   }
 
   @Post(':id/members')
-  @ApiOperation({ summary: 'Aktif personeli aktif bir ekibe atar' })
+  @Roles(AccountRole.ADMIN)
+  @ApiOperation({
+    summary: 'Aktif personeli aktif bir ekibe atar',
+    description: 'İzin verilen roller: ADMIN.',
+  })
   @ApiParam({ name: 'id', type: Number, example: 1 })
   @ApiCreatedResponse({
     description: 'Personel ekibe atandı',
@@ -136,8 +168,12 @@ export class TeamsController {
   }
 
   @Delete(':id/members/:workforceUserId')
+  @Roles(AccountRole.ADMIN)
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Personeli silmeden ekip üyeliğini kaldırır' })
+  @ApiOperation({
+    summary: 'Personeli silmeden ekip üyeliğini kaldırır',
+    description: 'İzin verilen roller: ADMIN.',
+  })
   @ApiParam({ name: 'id', type: Number, example: 1 })
   @ApiParam({ name: 'workforceUserId', type: Number, example: 10 })
   @ApiNoContentResponse({
