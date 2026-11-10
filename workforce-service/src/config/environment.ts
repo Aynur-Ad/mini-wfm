@@ -1,4 +1,10 @@
+import {
+  isValidPassword,
+  normalizeUsername,
+} from '../accounts/password-policy.js';
 export interface Environment {
+  INITIAL_ADMIN_USERNAME: string;
+  INITIAL_ADMIN_PASSWORD: string;
   WORKFORCE_HOST: string;
   WORKFORCE_PORT: number;
   DB_HOST: string;
@@ -12,6 +18,8 @@ type Setting = { type: 'string' | 'port'; default?: string | number };
 
 // Her uygulama yalnızca kendi ihtiyaç duyduğu ayarları tanımlar.
 const schema: Record<keyof Environment, Setting> = {
+  INITIAL_ADMIN_USERNAME: { type: 'string', default: 'admin' },
+  INITIAL_ADMIN_PASSWORD: { type: 'string' },
   WORKFORCE_HOST: { type: 'string', default: '127.0.0.1' },
   WORKFORCE_PORT: { type: 'port', default: 4001 },
   DB_HOST: { type: 'string' },
@@ -57,6 +65,27 @@ export function validateEnvironment(
       // Şifre gibi metinlerin içeriğini değiştirmeden sakla.
       result[key] = String(value);
     }
+  }
+
+  if (typeof result.INITIAL_ADMIN_USERNAME === 'string') {
+    result.INITIAL_ADMIN_USERNAME = normalizeUsername(
+      result.INITIAL_ADMIN_USERNAME,
+    );
+    if (
+      !result.INITIAL_ADMIN_USERNAME ||
+      result.INITIAL_ADMIN_USERNAME.length > 50
+    )
+      errors.push(
+        'INITIAL_ADMIN_USERNAME: 1 ile 50 karakter arasında olmalıdır.',
+      );
+  }
+  if (
+    result.INITIAL_ADMIN_PASSWORD !== undefined &&
+    !isValidPassword(result.INITIAL_ADMIN_PASSWORD)
+  ) {
+    errors.push(
+      'INITIAL_ADMIN_PASSWORD: en az 8 karakter ve en fazla 72 UTF-8 byte olmalıdır.',
+    );
   }
 
   if (errors.length > 0) {

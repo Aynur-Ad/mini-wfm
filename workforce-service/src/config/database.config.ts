@@ -1,3 +1,4 @@
+import { createInitialAdminSeed } from './initial-admin.config.js';
 import { DatabaseLogger } from '../common/logging/database-logger.js';
 import type { ConfigService } from '@nestjs/config';
 import type { TypeOrmModuleOptions } from '@nestjs/typeorm';
@@ -6,12 +7,22 @@ import { fileURLToPath } from 'node:url';
 import * as path from 'node:path';
 import type { Environment } from './environment.js';
 
-export function createDatabaseOptions(
+export async function createDatabaseOptions(
   config: ConfigService<Environment, true>,
-): TypeOrmModuleOptions {
+): Promise<TypeOrmModuleOptions> {
   const sourceDir = fileURLToPath(new URL('../', import.meta.url));
   return {
     type: 'postgres',
+    extra: {
+      initialAdmin: await createInitialAdminSeed({
+        INITIAL_ADMIN_USERNAME: config.get('INITIAL_ADMIN_USERNAME', {
+          infer: true,
+        }),
+        INITIAL_ADMIN_PASSWORD: config.get('INITIAL_ADMIN_PASSWORD', {
+          infer: true,
+        }),
+      }),
+    },
     logger: new DatabaseLogger(),
     host: config.get('DB_HOST', { infer: true }),
     port: config.get('DB_PORT', { infer: true }),

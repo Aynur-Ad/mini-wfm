@@ -73,9 +73,15 @@ DB_PORT=5433
 DB_NAME=mini_wfm
 DB_USER=postgres
 DB_PASSWORD=mysecretpassword
+INITIAL_ADMIN_USERNAME=admin
+INITIAL_ADMIN_PASSWORD=
 ```
 
 Bu değerler depodaki **yerel geliştirme** Compose ayarlarıdır. Compose kullanıcı veya şifresini değiştirdiyseniz `.env` değerlerini de eşleştirin. `.env` Git'e eklenmez; `.env.example` depoda kalır.
+
+`INITIAL_ADMIN_PASSWORD` alanını ilk çalıştırmadan önce kendi belirleyeceğiniz bir şifreyle doldurun. Şifre en az 8 karakter, en fazla 72 UTF-8 byte olmalı ve yalnızca boşluklardan oluşmamalıdır. Hazır bir yönetici şifresi tanımlı değildir. `INITIAL_ADMIN_USERNAME` varsayılan olarak `admin` olur; kullanıcı adları küçük harfle saklanır.
+
+İlk yönetici hesabı ayrı bir seed migration'ıyla yalnızca bir kez oluşturulur. Sonraki açılışlarda `.env` şifresini değiştirmek mevcut hesabın şifresini güncellemez. Seed migration'ını geri alırken aynı ilk yönetici kullanıcı adı ayarını kullanın.
 
 API veritabanına bağlanmaz. `api/.env`, PORT=3000, WORKFORCE_HOST=127.0.0.1 ve WORKFORCE_PORT=4001 ayarlarını içerir. API hedef portu ile servisin dinlediği port eşleşmelidir.
 
@@ -339,6 +345,23 @@ Ekip listesinden bir ekibin detayını açın. **Üyeler** tablosu sicil numaras
 - **Eşzamanlı değişiklik:** Backend 404/409 döndürürse güncel üyelik bilgileri yeniden alınır. Başka kullanıcının arada atadığı personel tekrar seçilemez; hata mesajı mevcut ortak HTTP istemcisinden gösterilir.
 
 Yerel kontrol: Bir personeli ekleyin, personel listesindeki ekip bilgisini kontrol edin, çıkarma onayından önce vazgeçin ve sonra onaylayın. Kayıt silinmeden ekip bilgisinin boşaldığını doğrulayın. Başka ekibe atanmış/pasif personelleri ve pasif ekibin buton açıklamasını da deneyin.
+
+## Kullanıcı hesapları
+
+Hesaplar uygulamaya giriş yapacak kullanıcıları temsil eder; personel kayıtlarından ayrıdır. Kullanıcı adı, rol ve aktiflik bilgisiyle birlikte `workforce.account` tablosunda tutulur. Roller `ADMIN`, `PLANNER` ve `VIEWER` değerleridir. Hesap uçlarında rol kontrolü henüz etkin değildir.
+
+| İşlem | Endpoint | Açıklama |
+| --- | --- | --- |
+| Hesap oluşturma | POST `/api/accounts` | Kullanıcı adı, şifre ve rol alır; `201` döndürür. |
+| Hesap listesi | GET `/api/accounts` | Sayfalı hesap listesi döndürür. |
+
+Swagger'da **Accounts** bölümünden bir kullanıcı adı, kurallara uygun şifre ve rol girerek hesap oluşturabilirsiniz. Kullanıcı adı en fazla 50 karakterdir; baştaki/sondaki boşluklar temizlenir ve küçük harfe çevrilir. `Ali` ve `ali` aynı kullanıcı adı sayılır; tekrarında `409` döner. Listede `page`, `limit`, `search` ve `isActive` parametreleri kullanılabilir.
+
+Şifreler bcrypt ile hash'lenir; `password_hash` alanı veritabanında `$2b$12$` ile başlayan bir değer içerir. Oluşturma, listeleme ve kimlik doğrulama yanıtlarında şifre veya hash bulunmaz. Hash'in yanında ayrı bir düz metin şifre alanı tutulmaz.
+
+Workforce-service'teki `validateCredentials` TCP mesajı kullanıcı adı ve şifreyi doğrular. Hatalı kullanıcı adı, hatalı şifre ve pasif hesap için aynı `401` mesajı döner. Henüz HTTP giriş endpoint'i veya JWT eklenmemiştir.
+
+Entegrasyon testleri hesap tablosunu ve ilk yönetici migration'ını da kapsar. Test yönetici şifresi rastgele üretilir; gerçek `.env` kullanılmaz. Her testten sonra hesaplar temizlenir ve test yöneticisi yeniden oluşturularak aynı başlangıç durumu korunur.
 
 ## Veritabanını inceleme
 

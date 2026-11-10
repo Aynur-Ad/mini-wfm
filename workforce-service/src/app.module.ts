@@ -1,3 +1,4 @@
+import { AccountsModule } from './accounts/accounts.module.js';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -19,6 +20,7 @@ import { WorkforceUsersModule } from './workforce_users/workforce_users.module.j
       inject: [ConfigService],
       useFactory: createDatabaseOptions,
     }),
+    AccountsModule,
     TeamsModule,
     WorkforceUsersModule,
   ],

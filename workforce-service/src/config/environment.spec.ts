@@ -1,9 +1,11 @@
+import { randomUUID } from 'node:crypto';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import { describe, expect, it } from 'vitest';
 import { validateEnvironment } from './environment.js';
 import type { Environment } from './environment.js';
 const valid = {
+  INITIAL_ADMIN_PASSWORD: randomUUID(),
   DB_HOST: 'localhost',
   DB_USER: 'postgres',
   DB_PASSWORD: 'test-only',
@@ -88,5 +90,31 @@ describe('Veritabanı ayarları', () => {
     expect(() => validateEnvironment({ ...valid, DB_PORT: 'abc' })).toThrow(
       'DB_PORT',
     );
+  });
+});
+
+describe('İlk yönetici ayarları', () => {
+  it('zorunlu şifre eksikse güvenli hata verir', () => {
+    expect(() =>
+      validateEnvironment({ ...valid, INITIAL_ADMIN_PASSWORD: undefined }),
+    ).toThrow('INITIAL_ADMIN_PASSWORD');
+  });
+  it.each(['short', ' '.repeat(8), 'ü'.repeat(37)])(
+    'geçersiz ilk yönetici şifresi reddedilir',
+    (password) => {
+      try {
+        validateEnvironment({ ...valid, INITIAL_ADMIN_PASSWORD: password });
+        expect.fail('Şifre reddedilmeliydi');
+      } catch (error) {
+        expect((error as Error).message).toContain('INITIAL_ADMIN_PASSWORD');
+        expect((error as Error).message).not.toContain(password);
+      }
+    },
+  );
+  it('ilk yönetici adı normalize edilir', () => {
+    expect(
+      validateEnvironment({ ...valid, INITIAL_ADMIN_USERNAME: ' Admin ' })
+        .INITIAL_ADMIN_USERNAME,
+    ).toBe('admin');
   });
 });
