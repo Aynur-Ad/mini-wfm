@@ -1,3 +1,5 @@
+import { AccountsController } from './accounts/accounts.controller.js';
+import { AccountsService } from './accounts/accounts.service.js';
 import { WorkforceClient } from './common/clients/workforce-client.js';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { validateEnvironment } from './config/environment.js';
@@ -35,8 +37,14 @@ import { WorkforceUsersController } from './workforce_users/workforce_users.cont
       },
     ]),
   ],
-  controllers: [AppController, TeamsController, WorkforceUsersController], // gelen http isteklerini karşılayıp yanıt dönecek denetleyicileri kaydeder.
+  controllers: [
+    AppController,
+    TeamsController,
+    WorkforceUsersController,
+    AccountsController,
+  ], // gelen http isteklerini karşılayıp yanıt dönecek denetleyicileri kaydeder.
   providers: [
+    AccountsService,
     AppService,
     TeamsService,
     WorkforceUsersService,
