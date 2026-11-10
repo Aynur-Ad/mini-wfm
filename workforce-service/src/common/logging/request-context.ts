@@ -1,8 +1,10 @@
+import type { Actor } from './actor.js';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { randomUUID } from 'node:crypto';
 
 export interface RequestContext {
   correlationId: string;
+  actor?: Actor | null;
 }
 
 export const requestContext = new AsyncLocalStorage<RequestContext>();

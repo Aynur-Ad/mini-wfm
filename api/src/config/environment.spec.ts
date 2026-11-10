@@ -1,9 +1,10 @@
+import { randomBytes } from 'node:crypto';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import { describe, expect, it } from 'vitest';
 import { validateEnvironment } from './environment.js';
 import type { Environment } from './environment.js';
-const valid = {};
+const valid = { JWT_SECRET: randomBytes(32).toString('hex') };
 
 describe('Ortam ayarları', () => {
   it('varsayılan portu sayı olarak döndürür', () => {
@@ -64,6 +65,30 @@ describe('Ortam ayarları', () => {
       expect(config.get('WORKFORCE_PORT', { infer: true })).toBe(4100);
     } finally {
       await module.close();
+    }
+  });
+});
+
+describe('JWT imza anahtarı', () => {
+  it.each([undefined, '', ' '.repeat(32), 'short', 'a'.repeat(31)])(
+    'eksik/kısa anahtarı reddeder',
+    (key) => {
+      expect(() => validateEnvironment({ ...valid, JWT_SECRET: key })).toThrow(
+        'JWT_SECRET',
+      );
+    },
+  );
+  it('32 karakterlik anahtarı kabul eder', () => {
+    const key = randomBytes(16).toString('hex');
+    expect(validateEnvironment({ JWT_SECRET: key }).JWT_SECRET).toBe(key);
+  });
+  it('hata mesajında gizli anahtar yer almaz', () => {
+    const key = randomBytes(8).toString('hex');
+    try {
+      validateEnvironment({ JWT_SECRET: key });
+      expect.fail('Anahtar reddedilmeliydi');
+    } catch (error) {
+      expect((error as Error).message).not.toContain(key);
     }
   });
 });

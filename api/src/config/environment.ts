@@ -1,4 +1,5 @@
 export interface Environment {
+  JWT_SECRET: string;
   PORT: number;
   WORKFORCE_HOST: string;
   WORKFORCE_PORT: number;
@@ -8,6 +9,7 @@ type Setting = { type: 'string' | 'port'; default?: string | number };
 
 // Her uygulama yalnızca kendi ihtiyaç duyduğu ayarları tanımlar.
 const schema: Record<keyof Environment, Setting> = {
+  JWT_SECRET: { type: 'string' },
   PORT: { type: 'port', default: 3000 },
   WORKFORCE_HOST: { type: 'string', default: '127.0.0.1' },
   WORKFORCE_PORT: { type: 'port', default: 4001 },
@@ -49,6 +51,13 @@ export function validateEnvironment(
       // Şifre gibi metinlerin içeriğini değiştirmeden sakla.
       result[key] = String(value);
     }
+  }
+
+  if (
+    typeof result.JWT_SECRET === 'string' &&
+    Array.from(result.JWT_SECRET).length < 32
+  ) {
+    errors.push('JWT_SECRET: en az 32 karakter olmalıdır.');
   }
 
   if (errors.length > 0) {

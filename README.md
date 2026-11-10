@@ -85,6 +85,15 @@ Bu değerler depodaki **yerel geliştirme** Compose ayarlarıdır. Compose kulla
 
 API veritabanına bağlanmaz. `api/.env`, PORT=3000, WORKFORCE_HOST=127.0.0.1 ve WORKFORCE_PORT=4001 ayarlarını içerir. API hedef portu ile servisin dinlediği port eşleşmelidir.
 
+`api/.env` dosyasına ayrıca `JWT_SECRET` ekleyin. En az 32 karakterlik kendi rastgele imza anahtarınızı kullanın; varsayılan bir anahtar yoktur. Aşağıdaki komutla 32 rastgele byte'tan 64 karakterlik hex anahtar üretebilirsiniz:
+
+```powershell
+node -e "process.stdout.write(require('node:crypto').randomBytes(32).toString('hex'))"
+```
+
+Üretilen değeri yalnızca kendi `.env` dosyanızdaki `JWT_SECRET=` alanına yazın. Gerçek anahtarı `.env.example`, kaynak kod veya PR içine koymayın. Anahtar eksik ya da kısaysa API başlamaz. Workforce-service JWT anahtarına ihtiyaç duymaz.
+
+
 ## 4. PostgreSQL'i başlatma
 
 Docker Desktop açıkken proje kökünde:
@@ -256,9 +265,27 @@ pnpm --dir web lint
 
 Lint çıktısındaki hata ve uyarıları kontrol edin; hataları giderdikten sonra komutu yeniden çalıştırın.
 
+## Giriş ve kimlik doğrulama
+
+`POST /api/auth/login` kullanıcı adı ve şifreyle giriş yapar. Doğrulama workforce-service'te, JWT üretimi ve token kontrolü API'de yapılır. Başarılı yanıt `accessToken`, saniye cinsinden `expiresIn` (28800) ve `user` alanlarını içerir. Kullanıcı bilgisi yalnızca `id`, `username` ve `role` içerir; şifre/hash döndürülmez.
+
+Swagger'da önce **Auth → POST /api/auth/login → Try it out** üzerinden mevcut bir hesapla giriş yapın. İlk yönetici için `.env` içinde belirlediğiniz kullanıcı adı ve şifreyi kullanabilirsiniz. Dönen `accessToken` değerini **Authorize** alanına yapıştırın; Swagger Bearer önekini kendisi ekler.
+
+`GET /api/auth/me` token sahibinin ID, kullanıcı adı ve rolünü döndürür. Login ve health dışındaki API endpoint'leri geçerli bir token ister. Token yoksa, imza bozulmuşsa veya süre dolmuşsa `401` döner. Hatalı kullanıcı adı, hatalı şifre ve pasif hesapla girişte aynı `Kullanıcı adı veya şifre hatalı` mesajı kullanılır. Biçimsel olarak geçersiz istek gövdeleri `400` döndürür.
+
+Token 8 saat geçerlidir; refresh token yoktur. Süre dolunca tekrar giriş yapılır. Token içinde kullanıcı bilgisine ek olarak standart `iat` ve `exp` zaman alanları bulunur. `/auth/me` veritabanına tekrar sorgu atmadan token'daki kimliği gösterir; hesap/rol sonradan değiştiğinde mevcut token süresi dolana kadar eski bilgiyi taşır.
+
+Bu aşamada kimlik doğrulama vardır; rol bazlı işlem kısıtları henüz uygulanmaz. Web arayüzünün giriş ve token yönetimi henüz eklenmediğinden bu kontrolleri Swagger üzerinden yapın.
+
+### Servisler arasında kullanıcı bilgisi
+
+Korunan bir istekte JWT guard'ın doğruladığı kullanıcı, TCP mesajına `{ id, username, role }` biçiminde `actor` alanıyla eklenir. İstek kimliği aynı zarfın `correlationId` alanında kalır. Login ve health gibi anonim çağrılarda `actor` null olur. Workforce-service token almaz; actor bilgisini istek kapsamında tutar.
+
+Korumalı HTTP isteklerinin loglarında doğrulanan `userId`, servis mesajı alındı loglarında `actorId` görülür. Şifre, JWT ve imza anahtarı loglanmaz.
+
 ## Swagger üzerinden ilk kontrol
 
-Swagger'da endpoint'i açıp **Try it out → Execute** ile istek gönderin.
+Swagger'da giriş yapıp Authorize alanına token ekledikten sonra endpoint'i açıp **Try it out → Execute** ile istek gönderin.
 
 | Kaynak | Oluşturma | Liste | Detay | Güncelleme | Silme |
 | --- | --- | --- | --- | --- | --- |
@@ -348,7 +375,7 @@ Yerel kontrol: Bir personeli ekleyin, personel listesindeki ekip bilgisini kontr
 
 ## Kullanıcı hesapları
 
-Hesaplar uygulamaya giriş yapacak kullanıcıları temsil eder; personel kayıtlarından ayrıdır. Kullanıcı adı, rol ve aktiflik bilgisiyle birlikte `workforce.account` tablosunda tutulur. Roller `ADMIN`, `PLANNER` ve `VIEWER` değerleridir. Hesap uçlarında rol kontrolü henüz etkin değildir.
+Hesaplar uygulamaya giriş yapacak kullanıcıları temsil eder; personel kayıtlarından ayrıdır. Kullanıcı adı, rol ve aktiflik bilgisiyle birlikte `workforce.account` tablosunda tutulur. Roller `ADMIN`, `PLANNER` ve `VIEWER` değerleridir. Hesap uçları token gerektirir; rol bazlı izin kontrolü henüz etkin değildir.
 
 | İşlem | Endpoint | Açıklama |
 | --- | --- | --- |
@@ -359,7 +386,7 @@ Swagger'da **Accounts** bölümünden bir kullanıcı adı, kurallara uygun şif
 
 Şifreler bcrypt ile hash'lenir; `password_hash` alanı veritabanında `$2b$12$` ile başlayan bir değer içerir. Oluşturma, listeleme ve kimlik doğrulama yanıtlarında şifre veya hash bulunmaz. Hash'in yanında ayrı bir düz metin şifre alanı tutulmaz.
 
-Workforce-service'teki `validateCredentials` TCP mesajı kullanıcı adı ve şifreyi doğrular. Hatalı kullanıcı adı, hatalı şifre ve pasif hesap için aynı `401` mesajı döner. Henüz HTTP giriş endpoint'i veya JWT eklenmemiştir.
+Workforce-service'teki `validateCredentials` TCP mesajı kullanıcı adı ve şifreyi doğrular. Hatalı kullanıcı adı, hatalı şifre ve pasif hesap için aynı `401` mesajı döner. API giriş endpoint'i bu mesajı kullanarak doğrulama yapar ve JWT üretir.
 
 Entegrasyon testleri hesap tablosunu ve ilk yönetici migration'ını da kapsar. Test yönetici şifresi rastgele üretilir; gerçek `.env` kullanılmaz. Her testten sonra hesaplar temizlenir ve test yöneticisi yeniden oluşturularak aynı başlangıç durumu korunur.
 
@@ -391,6 +418,7 @@ Volume silinmediği için veriler korunur.
 
 | Durum | Kontrol |
 | --- | --- |
+| API 401 dönüyor | Giriş yapın; Swagger Authorize alanındaki tokenı ve geçerlilik süresini kontrol edin. |
 | API 503 dönüyor | Workforce service açık mı ve 4001 portunu dinliyor mu? |
 | Veritabanına bağlanılamıyor | Docker Desktop, container durumu ve `workforce-service/.env` değerlerini kontrol edin. |
 | Kullanıcı/şifre hatası | `.env` ile Compose ayarlarını karşılaştırın. Mevcut volume, ilk oluşturulurken kullanılan veritabanı kullanıcı/şifresini korur. |
