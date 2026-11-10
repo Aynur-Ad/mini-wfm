@@ -3,6 +3,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { AuthController } from './auth/auth.controller.js';
 import { AuthService } from './auth/auth.service.js';
 import { JwtGuard } from './common/guards/jwt.guard.js';
+import { RolesGuard } from './common/guards/roles.guard.js';
 import {
   ACCESS_TOKEN_TTL_SECONDS,
   JWT_ALGORITHM,
@@ -67,6 +68,8 @@ import { WorkforceUsersController } from './workforce_users/workforce_users.cont
   providers: [
     AuthService,
     { provide: APP_GUARD, useClass: JwtGuard },
+    // Kimlik doğrulanmadan rol kontrolü yapılmamalıdır; kayıt sırası önemlidir.
+    { provide: APP_GUARD, useClass: RolesGuard },
     AccountsService,
     AppService,
     TeamsService,

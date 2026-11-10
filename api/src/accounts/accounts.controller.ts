@@ -1,4 +1,10 @@
-import { ApiBearerAuth } from '@nestjs/swagger';
+import { Roles } from '../common/decorators/roles.decorator.js';
+import { AccountRole } from './account-role.js';
+import {
+  ApiForbiddenResponse,
+  ApiUnauthorizedResponse,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
@@ -18,14 +24,19 @@ import {
 
 @ApiTags('Accounts')
 @ApiBearerAuth('access-token')
+@ApiUnauthorizedResponse({
+  description: 'Token yok, geçersiz veya süresi dolmuş',
+})
+@ApiForbiddenResponse({ description: 'Bu işlem için yetkiniz yok' })
 @Controller('accounts')
 export class AccountsController {
   constructor(private readonly accounts: AccountsService) {}
 
   @Post()
+  @Roles(AccountRole.ADMIN)
   @ApiOperation({
     summary: 'Hesap oluşturur',
-    description: 'Rol kontrolü henüz etkin değildir.',
+    description: 'İzin verilen roller: ADMIN.',
   })
   @ApiCreatedResponse({ type: AccountResponseDto })
   @ApiBadRequestResponse({
@@ -37,10 +48,11 @@ export class AccountsController {
   }
 
   @Get()
+  @Roles(AccountRole.ADMIN)
   @ApiOperation({
     summary: 'Hesapları sayfalı listeler',
     description:
-      'Şifre ve hash alanları yanıtta bulunmaz. Rol kontrolü henüz etkin değildir.',
+      'Şifre ve hash alanları yanıtta bulunmaz. İzin verilen roller: ADMIN.',
   })
   @ApiOkResponse({ type: AccountsPageDto })
   @ApiBadRequestResponse({ description: 'Sayfalama veya filtre geçersiz' })

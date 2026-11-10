@@ -11,7 +11,10 @@ export class AppController {
 
   @Public()
   @Get('health')
-  @ApiOperation({ summary: 'Workforce servis bağlantısını kontrol eder' })
+  @ApiOperation({
+    summary: 'Workforce servis bağlantısını kontrol eder',
+    description: 'Herkese açık; token gerekmez.',
+  })
   @ApiResponse({
     status: 200,
     description: 'Workforce servisinden gelen pong yanıtı',

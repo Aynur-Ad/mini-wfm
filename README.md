@@ -275,7 +275,23 @@ Swagger'da önce **Auth → POST /api/auth/login → Try it out** üzerinden mev
 
 Token 8 saat geçerlidir; refresh token yoktur. Süre dolunca tekrar giriş yapılır. Token içinde kullanıcı bilgisine ek olarak standart `iat` ve `exp` zaman alanları bulunur. `/auth/me` veritabanına tekrar sorgu atmadan token'daki kimliği gösterir; hesap/rol sonradan değiştiğinde mevcut token süresi dolana kadar eski bilgiyi taşır.
 
-Bu aşamada kimlik doğrulama vardır; rol bazlı işlem kısıtları henüz uygulanmaz. Web arayüzünün giriş ve token yönetimi henüz eklenmediğinden bu kontrolleri Swagger üzerinden yapın.
+Kimlik doğrulamadan sonra rol kontrolü yapılır. Token geçerli olduğu halde rolün izni yoksa `403` ve `Bu işlem için yetkiniz yok` mesajı döner. Web arayüzünün giriş ve token yönetimi henüz eklenmediğinden bu kontrolleri Swagger üzerinden yapın.
+
+### Roller ve izinler
+
+| İşlem | VIEWER | PLANNER | ADMIN |
+| --- | --- | --- | --- |
+| Ekip ve personel listeleri/detayları | Evet | Evet | Evet |
+| Kendi kullanıcı bilgisini görme (`GET /api/auth/me`) | Evet | Evet | Evet |
+| Ekip ve personel oluşturma, güncelleme, silme | Hayır | Hayır | Evet |
+| Ekip üyeliği ekleme ve kaldırma | Hayır | Hayır | Evet |
+| Hesap oluşturma ve listeleme | Hayır | Hayır | Evet |
+
+İzinler API controller'larında `@Roles(...)` ile tanımlanır. `JwtGuard` önce token'ı doğrular; ardından `RolesGuard` doğrulanan kullanıcının rolünü kontrol eder. `@Roles` tanımı olmayan endpoint'ler varsayılan olarak yalnızca admin'e açıktır. `@Public()` ile işaretli login ve health bu kontrolden muaftır. Hesap listesi GET olmasına rağmen yalnızca admin'e açıktır; yalnızca HTTP metoduna bakarak izin verilmez.
+
+Swagger'da admin hesabıyla giriş yapıp bir `VIEWER` ve bir `PLANNER` hesabı oluşturun. Her hesap için login'den token alın; Authorize içindeki önceki token'ı değiştirin. Viewer ekip listesini okuyabilmeli, ekip oluştururken `403` almalıdır. Planner da ekip/personel kayıtlarını okuyabilir; bunları değiştiremez ve hesap listesini göremez. Admin tüm mevcut işlemleri kullanabilir. Swagger endpoint açıklamaları izin verilen rolleri gösterir.
+
+Butonları arayüzde gizlemek doğrudan HTTP isteği gönderilmesini engellemez. İzin kontrolü backend'de yapılır ve yetkisiz istek workforce-service'e iletilmez. Vardiya, iş emri ve rapor endpoint'leri eklendiğinde kendi izinleri ayrıca tanımlanacaktır.
 
 ### Servisler arasında kullanıcı bilgisi
 
@@ -375,14 +391,14 @@ Yerel kontrol: Bir personeli ekleyin, personel listesindeki ekip bilgisini kontr
 
 ## Kullanıcı hesapları
 
-Hesaplar uygulamaya giriş yapacak kullanıcıları temsil eder; personel kayıtlarından ayrıdır. Kullanıcı adı, rol ve aktiflik bilgisiyle birlikte `workforce.account` tablosunda tutulur. Roller `ADMIN`, `PLANNER` ve `VIEWER` değerleridir. Hesap uçları token gerektirir; rol bazlı izin kontrolü henüz etkin değildir.
+Hesaplar uygulamaya giriş yapacak kullanıcıları temsil eder; personel kayıtlarından ayrıdır. Kullanıcı adı, rol ve aktiflik bilgisiyle birlikte `workforce.account` tablosunda tutulur. Roller `ADMIN`, `PLANNER` ve `VIEWER` değerleridir. Hesap oluşturma ve listeleme yalnızca `ADMIN` rolüne açıktır; geçerli token taşıyan `VIEWER` ve `PLANNER` kullanıcıları da bu uçlardan `403` alır.
 
 | İşlem | Endpoint | Açıklama |
 | --- | --- | --- |
 | Hesap oluşturma | POST `/api/accounts` | Kullanıcı adı, şifre ve rol alır; `201` döndürür. |
 | Hesap listesi | GET `/api/accounts` | Sayfalı hesap listesi döndürür. |
 
-Swagger'da **Accounts** bölümünden bir kullanıcı adı, kurallara uygun şifre ve rol girerek hesap oluşturabilirsiniz. Kullanıcı adı en fazla 50 karakterdir; baştaki/sondaki boşluklar temizlenir ve küçük harfe çevrilir. `Ali` ve `ali` aynı kullanıcı adı sayılır; tekrarında `409` döner. Listede `page`, `limit`, `search` ve `isActive` parametreleri kullanılabilir.
+Swagger'da admin hesabıyla giriş yaptıktan sonra **Accounts** bölümünden bir kullanıcı adı, kurallara uygun şifre ve rol girerek hesap oluşturabilirsiniz. Kullanıcı adı en fazla 50 karakterdir; baştaki/sondaki boşluklar temizlenir ve küçük harfe çevrilir. `Ali` ve `ali` aynı kullanıcı adı sayılır; tekrarında `409` döner. Listede `page`, `limit`, `search` ve `isActive` parametreleri kullanılabilir.
 
 Şifreler bcrypt ile hash'lenir; `password_hash` alanı veritabanında `$2b$12$` ile başlayan bir değer içerir. Oluşturma, listeleme ve kimlik doğrulama yanıtlarında şifre veya hash bulunmaz. Hash'in yanında ayrı bir düz metin şifre alanı tutulmaz.
 
