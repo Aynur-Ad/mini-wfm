@@ -1,3 +1,4 @@
+import { Shift } from '../shifts/entities/shift.entity.js';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -197,13 +198,43 @@ export class WorkforceUsersService {
   }
 
   async remove(id: number): Promise<{ deleted: boolean; id: number }> {
-    // 1. Personel var mı kontrol et (Yoksa findOne metodu 404 RpcException fırlatır)
-    const workforceUser = await this.findOne(id);
-
-    // 2. Varsa veritabanından sil
-    await this.workforceUserRepository.remove(workforceUser);
-
-    return { deleted: true, id };
+    return this.workforceUserRepository.manager.transaction(async (manager) => {
+      const repository = manager.getRepository(WorkforceUser);
+      const person = await repository.findOne({
+        where: { id },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!person)
+        throw new RpcException({
+          statusCode: 404,
+          message: 'Personel bulunamadı.',
+        });
+      if (
+        await manager.getRepository(Shift).existsBy({ workforceUserId: id })
+      ) {
+        throw new RpcException({
+          statusCode: 409,
+          message: 'Vardiyası olan personel silinemez',
+        });
+      }
+      try {
+        await repository.remove(person);
+      } catch (error: unknown) {
+        // API dışından yazılan kayıtlar da FK ile korunur; ham DB hatası taşınmaz.
+        if (
+          error instanceof QueryFailedError &&
+          error.driverError.code === '23503' &&
+          error.driverError.constraint === 'FK_shift_workforce_user'
+        ) {
+          throw new RpcException({
+            statusCode: 409,
+            message: 'Vardiyası olan personel silinemez',
+          });
+        }
+        throw error;
+      }
+      return { deleted: true, id };
+    });
   }
 
   private async saveWorkforceUser(

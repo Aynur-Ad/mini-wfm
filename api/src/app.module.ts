@@ -1,3 +1,5 @@
+import { ShiftsController } from './shifts/shifts.controller.js';
+import { ShiftsService } from './shifts/shifts.service.js';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtModule } from '@nestjs/jwt';
 import { AuthController } from './auth/auth.controller.js';
@@ -59,6 +61,7 @@ import { WorkforceUsersController } from './workforce_users/workforce_users.cont
     ]),
   ],
   controllers: [
+    ShiftsController,
     AuthController,
     AppController,
     TeamsController,
@@ -66,6 +69,7 @@ import { WorkforceUsersController } from './workforce_users/workforce_users.cont
     AccountsController,
   ], // gelen http isteklerini karşılayıp yanıt dönecek denetleyicileri kaydeder.
   providers: [
+    ShiftsService,
     AuthService,
     { provide: APP_GUARD, useClass: JwtGuard },
     // Kimlik doğrulanmadan rol kontrolü yapılmamalıdır; kayıt sırası önemlidir.

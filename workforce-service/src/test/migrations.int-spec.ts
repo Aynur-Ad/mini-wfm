@@ -55,6 +55,28 @@ describe('Migration yaşam döngüsü — gerçek PostgreSQL', () => {
     try {
       const teamTable = await runner.getTable('workforce.team');
       const peopleTable = await runner.getTable('workforce.workforce_user');
+      const shiftTable = await runner.getTable('workforce.shift');
+      expect(
+        shiftTable?.indices.some(
+          (index) => index.name === 'IDX_shift_start_at',
+        ),
+      ).toBe(true);
+      expect(
+        shiftTable?.foreignKeys.some(
+          (key) =>
+            key.name === 'FK_shift_workforce_user' &&
+            key.onDelete === 'RESTRICT',
+        ),
+      ).toBe(true);
+      expect(
+        shiftTable?.foreignKeys.some(
+          (key) => key.name === 'FK_shift_created_by',
+        ),
+      ).toBe(true);
+      expect(
+        shiftTable?.checks.some((check) => check.name === 'CHK_shift_duration'),
+      ).toBe(true);
+
       expect(
         teamTable?.uniques.some((unique) =>
           unique.columnNames.includes('name'),

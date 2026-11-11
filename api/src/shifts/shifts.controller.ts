@@ -1,0 +1,104 @@
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Param,
+  ParseIntPipe,
+  Patch,
+  Post,
+} from '@nestjs/common';
+import {
+  ApiBadRequestResponse,
+  ApiBearerAuth,
+  ApiConflictResponse,
+  ApiCreatedResponse,
+  ApiForbiddenResponse,
+  ApiNoContentResponse,
+  ApiNotFoundResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+  ApiUnauthorizedResponse,
+} from '@nestjs/swagger';
+import { map } from 'rxjs';
+import { Roles } from '../common/decorators/roles.decorator.js';
+import { AccountRole } from '../accounts/account-role.js';
+import { ShiftsService } from './shifts.service.js';
+import { CreateShiftDto } from './dto/create-shift.dto.js';
+import { UpdateShiftDto } from './dto/update-shift.dto.js';
+import { ShiftResponseDto } from './dto/shift-response.dto.js';
+
+@ApiTags('Shifts')
+@ApiBearerAuth('access-token')
+@ApiUnauthorizedResponse({
+  description: 'Token yok, geçersiz veya süresi dolmuş',
+})
+@ApiForbiddenResponse({ description: 'Bu işlem için yetkiniz yok' })
+@ApiBadRequestResponse({
+  description: 'Geçersiz ID/tarih veya 1–12 saat aralığı dışında vardiya',
+})
+@ApiNotFoundResponse({ description: 'Personel veya vardiya bulunamadı' })
+@Controller('shifts')
+export class ShiftsController {
+  constructor(private readonly shifts: ShiftsService) {}
+
+  @Post()
+  @Roles(AccountRole.ADMIN, AccountRole.PLANNER)
+  @ApiOperation({
+    summary: 'Vardiya oluşturur',
+    description:
+      'İzin verilen roller: ADMIN, PLANNER. createdById doğrulanmış actor bilgisinden alınır.',
+  })
+  @ApiCreatedResponse({ type: ShiftResponseDto })
+  @ApiConflictResponse({
+    description:
+      'Geçmiş tarih, pasif personel veya çakışan vardiya; çakışan saatler mesajda yer alır',
+  })
+  create(@Body() dto: CreateShiftDto) {
+    return this.shifts.create(dto);
+  }
+
+  @Get(':id')
+  @Roles(AccountRole.ADMIN, AccountRole.PLANNER, AccountRole.VIEWER)
+  @ApiOperation({
+    summary: 'Tek vardiyayı getirir',
+    description:
+      'İzin verilen roller: ADMIN, PLANNER, VIEWER. Tarihler UTC ISO 8601 (Z) biçiminde döner.',
+  })
+  @ApiOkResponse({ type: ShiftResponseDto })
+  findOne(@Param('id', ParseIntPipe) id: number) {
+    return this.shifts.findOne(id);
+  }
+
+  @Patch(':id')
+  @Roles(AccountRole.ADMIN, AccountRole.PLANNER)
+  @ApiOperation({
+    summary: 'Gelecekteki vardiyayı kısmi günceller',
+    description:
+      'İzin verilen roller: ADMIN, PLANNER. Gönderilmeyen alanlar korunur; note null ile temizlenebilir. createdById değişmez.',
+  })
+  @ApiOkResponse({ type: ShiftResponseDto })
+  @ApiConflictResponse({
+    description:
+      'Başlamış vardiya, geçmiş yeni tarih, pasif personel veya çakışma',
+  })
+  update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateShiftDto) {
+    return this.shifts.update(id, dto);
+  }
+
+  @Delete(':id')
+  @Roles(AccountRole.ADMIN, AccountRole.PLANNER)
+  @HttpCode(204)
+  @ApiOperation({
+    summary: 'Gelecekteki vardiyayı siler',
+    description:
+      'İzin verilen roller: ADMIN, PLANNER. Başlamış vardiya silinemez; başarılı yanıt gövdesizdir.',
+  })
+  @ApiNoContentResponse({ description: 'Vardiya silindi' })
+  @ApiConflictResponse({ description: 'Başlamış vardiya veya pasif personel' })
+  remove(@Param('id', ParseIntPipe) id: number) {
+    return this.shifts.remove(id).pipe(map(() => undefined));
+  }
+}
