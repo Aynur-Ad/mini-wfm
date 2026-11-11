@@ -34,6 +34,14 @@ const allRoles = Object.values(AccountRole);
 const adminOnly = [AccountRole.ADMIN];
 const routes = [
   {
+    method: 'get',
+    path: '/shifts',
+    pattern: 'findAllShifts',
+    roles: allRoles,
+    status: 200,
+    query: { from: '2027-01-01T00:00:00Z', to: '2027-01-02T00:00:00Z' },
+  },
+  {
     method: 'post',
     path: '/shifts',
     pattern: 'createShift',
@@ -246,7 +254,7 @@ describe('HTTP rol izinleri — gerçek global guard ve controller akışı', ()
   beforeEach(() => {
     send.mockReset();
     send.mockImplementation((pattern: string) =>
-      of(pattern === 'ping' ? 'pong' : {}),
+      of(pattern === 'ping' ? 'pong' : pattern === 'findAllShifts' ? [] : {}),
     );
   });
   afterAll(async () => {
@@ -259,6 +267,7 @@ describe('HTTP rol izinleri — gerçek global guard ve controller akışı', ()
       const allowed = (route.roles as readonly AccountRole[]).includes(role);
       const result = await call(app, route.method, `/api${route.path}`)
         .set('Authorization', `Bearer ${tokens.get(role)}`)
+        .query('query' in route ? route.query : {})
         .send('body' in route ? route.body : undefined);
       expect(result.status).toBe(allowed ? route.status : 403);
       if (allowed) {
@@ -403,6 +412,47 @@ describe('HTTP rol izinleri — gerçek global guard ve controller akışı', ()
       )
         .set('Authorization', `Bearer ${tokens.get(AccountRole.PLANNER)}`)
         .send(body);
+      expect(result.status).toBe(400);
+      expect(send).not.toHaveBeenCalled();
+    },
+  );
+
+  it('vardiya listesi array döner; query filtreleri TCP verisine sayı olarak taşınır', async () => {
+    const result = await request(app.getHttpServer())
+      .get('/api/shifts')
+      .set('Authorization', `Bearer ${tokens.get(AccountRole.VIEWER)}`)
+      .query({
+        from: '2027-01-01T00:00:00Z',
+        to: '2027-01-02T00:00:00Z',
+        workforceUserId: '7',
+        teamId: '3',
+        limit: '1',
+      });
+    expect(result.status).toBe(200);
+    expect(result.body).toEqual([]);
+    expect(send).toHaveBeenCalledWith(
+      'findAllShifts',
+      expect.objectContaining({
+        data: expect.objectContaining({ workforceUserId: 7, teamId: 3 }),
+      }),
+    );
+    expect(send.mock.calls[0][1].data).not.toHaveProperty('limit');
+  });
+
+  it.each([
+    {},
+    { from: '2027-01-01T00:00:00Z' },
+    { from: '2027-01-01T00:00:00Z', to: '2027-02-10T00:00:00Z' },
+    { from: '2027-01-01T00:00:00Z', to: '2027-01-01T00:00:00Z' },
+    { from: '2027-01-01T00:00:00', to: '2027-01-02T00:00:00Z' },
+    { from: '2027-01-01T00:00:00Z', to: '2027-01-02T00:00:00Z', teamId: 'abc' },
+  ])(
+    'vardiya liste filtresi geçersizse 400; TCP çağrılmaz: %j',
+    async (query) => {
+      const result = await request(app.getHttpServer())
+        .get('/api/shifts')
+        .set('Authorization', `Bearer ${tokens.get(AccountRole.VIEWER)}`)
+        .query(query);
       expect(result.status).toBe(400);
       expect(send).not.toHaveBeenCalled();
     },

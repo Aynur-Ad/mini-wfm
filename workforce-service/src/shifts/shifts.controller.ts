@@ -1,3 +1,4 @@
+import { QueryShiftsDto } from './dto/query-shifts.dto.js';
 import { Controller } from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 import { ShiftsService } from './shifts.service.js';
@@ -11,6 +12,11 @@ export class ShiftsController {
   @MessagePattern('createShift')
   create(@Payload() dto: CreateShiftDto) {
     return this.shifts.create(dto);
+  }
+
+  @MessagePattern('findAllShifts')
+  findAll(@Payload() query: QueryShiftsDto) {
+    return this.shifts.findAll(query);
   }
 
   @MessagePattern('findOneShift')

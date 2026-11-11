@@ -1,3 +1,5 @@
+import { QueryShiftsDto } from './dto/query-shifts.dto.js';
+import { ShiftListItemDto } from './dto/shift-list-item.dto.js';
 import {
   Body,
   Controller,
@@ -8,6 +10,7 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
@@ -58,6 +61,27 @@ export class ShiftsController {
   })
   create(@Body() dto: CreateShiftDto) {
     return this.shifts.create(dto);
+  }
+
+  @Get()
+  @Roles(AccountRole.ADMIN, AccountRole.PLANNER, AccountRole.VIEWER)
+  @ApiOperation({
+    summary: 'Tarih aralığıyla kesişen vardiyaları listeler',
+    description:
+      'İzin verilen roller: ADMIN, PLANNER, VIEWER. En fazla 31 günlük [from, to) aralığı; gece vardiyaları kısmen kesişse de döner. Liste sayfasız, başlangıca ve eşitlikte ID değerine göre artan sıralıdır. teamId personelin şu anki ekibidir.',
+  })
+  @ApiOkResponse({
+    type: ShiftListItemDto,
+    isArray: true,
+    description:
+      'Vardiya dizisi; personel ve güncel ekip özeti içerir. Sonuç yoksa [].',
+  })
+  @ApiBadRequestResponse({
+    description:
+      'Eksik/geçersiz from veya to, ters/boş ya da 31 günü aşan aralık, geçersiz filtre ID',
+  })
+  findAll(@Query() query: QueryShiftsDto) {
+    return this.shifts.findAll(query);
   }
 
   @Get(':id')

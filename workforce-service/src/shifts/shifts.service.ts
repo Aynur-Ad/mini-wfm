@@ -1,3 +1,5 @@
+import type { ShiftListItem } from './dto/shift-list-item.dto.js';
+import type { QueryShiftsDto } from './dto/query-shifts.dto.js';
 import { Injectable } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -45,6 +47,77 @@ export class ShiftsService {
         }),
       );
     });
+  }
+
+  async findAll(query: QueryShiftsDto): Promise<ShiftListItem[]> {
+    const from = new Date(query.from);
+    const to = new Date(query.to);
+    const duration = to.getTime() - from.getTime();
+    if (
+      !Number.isFinite(duration) ||
+      duration <= 0 ||
+      duration > 31 * 24 * 60 * 60 * 1000
+    ) {
+      fail(
+        400,
+        'to, from tarihinden sonra olmalı; sorgu aralığı en fazla 31 gün olabilir',
+      );
+    }
+    for (const id of [query.workforceUserId, query.teamId]) {
+      if (id !== undefined && (!Number.isInteger(id) || id < 1))
+        fail(400, 'Filtre ID değerleri pozitif tam sayı olmalıdır');
+    }
+    // Tek sorgu: personel ve ekip alanları join ile gelir; N+1 sorgusu yoktur.
+    const builder = this.shifts
+      .createQueryBuilder('shift')
+      .innerJoinAndSelect('shift.workforceUser', 'person')
+      .leftJoinAndSelect('person.team', 'team')
+      .select([
+        'shift.id',
+        'shift.workforceUserId',
+        'shift.startAt',
+        'shift.endAt',
+        'shift.note',
+        'shift.createdById',
+        'shift.createdAt',
+        'shift.updatedAt',
+        'person.id',
+        'person.firstName',
+        'person.lastName',
+        'team.id',
+        'team.name',
+      ])
+      // [from, to): sınırda yalnızca dokunan değil, gerçekten kesişen aralıklar.
+      .where('shift.startAt < :to', { to })
+      .andWhere('shift.endAt > :from', { from })
+      .orderBy('shift.startAt', 'ASC')
+      .addOrderBy('shift.id', 'ASC');
+    if (query.workforceUserId !== undefined)
+      builder.andWhere('shift.workforceUserId = :workforceUserId', {
+        workforceUserId: query.workforceUserId,
+      });
+    // Ekip geçmişi yoktur; filtre ve gösterilen ekip personelin güncel ekibidir.
+    if (query.teamId !== undefined)
+      builder.andWhere('person.teamId = :teamId', { teamId: query.teamId });
+    const rows = await builder.getMany();
+    return rows.map((row) => ({
+      id: row.id,
+      workforceUserId: row.workforceUserId,
+      startAt: row.startAt,
+      endAt: row.endAt,
+      note: row.note,
+      createdById: row.createdById,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      workforceUser: {
+        id: row.workforceUser.id,
+        firstName: row.workforceUser.firstName,
+        lastName: row.workforceUser.lastName,
+        team: row.workforceUser.team
+          ? { id: row.workforceUser.team.id, name: row.workforceUser.team.name }
+          : null,
+      },
+    }));
   }
 
   async findOne(id: number): Promise<Shift> {

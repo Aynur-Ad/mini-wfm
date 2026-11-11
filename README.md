@@ -220,7 +220,7 @@ pnpm --dir workforce-service test:int
 
 Normal `pnpm --dir workforce-service test` yalnızca unit testleri çalıştırır ve Docker gerektirmez. Entegrasyon testleri `src/test` altında `.int-spec.ts` uzantısıyla bulunur ve ayrı `vitest.config.int.ts` ayarıyla çalışır.
 
-Testler ekip adı tekilliğini, arama/sayfalamayı, üyelik/silme kurallarını, kullanıcı hesaplarını ve vardiya çakışmalarını kontrol eder. Vardiyalarda uç uca saatler, kendini hariç tutan güncelleme, paralel create/update ve personel silme FK kuralı da sınanır. Migration'ların geri alınıp tekrar uygulanması ayrıca doğrulanır. Unit testlerden farklı olarak repository ve PostgreSQL bağlantısı gerçektir.
+Testler ekip adı tekilliğini, arama/sayfalamayı, üyelik/silme kurallarını, kullanıcı hesaplarını ve vardiya çakışmalarını kontrol eder. Vardiyalarda uç uca saatler, kendini hariç tutan güncelleme, paralel create/update ve personel silme FK kuralı da sınanır. Liste sorgusunda gece vardiyası, aralık sınırları, birlikte filtreleme, güncel ekip sınırlaması ve tek SELECT ile ilişkili verinin yüklenmesi doğrulanır. Migration'ların geri alınıp tekrar uygulanması ayrıca doğrulanır. Unit testlerden farklı olarak repository ve PostgreSQL bağlantısı gerçektir.
 
 Geliştirme veritabanından bağımsızlığı doğrulamak için uygulamaları durdurup `docker compose stop postgres` çalıştırın; ardından `test:int` komutunu tekrar çalıştırın. Compose verileri korunur. Normal geliştirmeye dönmek için `docker compose up -d` kullanın.
 
@@ -286,7 +286,7 @@ Kimlik doğrulamadan sonra rol kontrolü yapılır. Token geçerli olduğu halde
 | Ekip ve personel oluşturma, güncelleme, silme | Hayır | Hayır | Evet |
 | Ekip üyeliği ekleme ve kaldırma | Hayır | Hayır | Evet |
 | Hesap oluşturma ve listeleme | Hayır | Hayır | Evet |
-| Vardiya detayı | Evet | Evet | Evet |
+| Vardiya listesi ve detayı | Evet | Evet | Evet |
 | Vardiya oluşturma, güncelleme ve silme | Hayır | Evet | Evet |
 
 İzinler API controller'larında `@Roles(...)` ile tanımlanır. `JwtGuard` önce token'ı doğrular; ardından `RolesGuard` doğrulanan kullanıcının rolünü kontrol eder. `@Roles` tanımı olmayan endpoint'ler varsayılan olarak yalnızca admin'e açıktır. `@Public()` ile işaretli login ve health bu kontrolden muaftır. Hesap listesi GET olmasına rağmen yalnızca admin'e açıktır; yalnızca HTTP metoduna bakarak izin verilmez.
@@ -415,6 +415,7 @@ Vardiya bir personelin başlangıç ve bitiş anları arasındaki çalışma kay
 | İşlem | Endpoint | İzin verilen roller | Başarı |
 | --- | --- | --- | --- |
 | Oluşturma | POST `/api/shifts` | ADMIN, PLANNER | 201 |
+| Liste | GET `/api/shifts` | ADMIN, PLANNER, VIEWER | 200; dizi |
 | Detay | GET `/api/shifts/:id` | ADMIN, PLANNER, VIEWER | 200 |
 | Kısmi güncelleme | PATCH `/api/shifts/:id` | ADMIN, PLANNER | 200 |
 | Silme | DELETE `/api/shifts/:id` | ADMIN, PLANNER | 204; gövdesiz |
@@ -425,7 +426,28 @@ Vardiya en az 1, en fazla 12 saat sürmelidir (`400`). Geçmişe ekleme veya ba�
 
 Aynı personelin aralıkları `mevcut.startAt < yeni.endAt && mevcut.endAt > yeni.startAt` ise çakışır. Örneğin 08:00–16:00 ile 12:00–20:00 çakışır; 16:00–22:00 çakışmaz. Çakışma yanıtı `409` ve çakışan vardiyanın UTC saatlerini içerir. Kendi saatleriyle güncellemede aynı vardiya çakışma sayılmaz. Personel satırı transaction içinde kilitlenerek eşzamanlı API yazmalarının kontrolü atlaması önlenir.
 
-Vardiyası olan personel, vardiya geçmişte olsa da silinemez (`409`). Foreign key doğrudan SQL ile silmeyi de engeller. Vardiya listeleme endpoint'i ve takvim arayüzü henüz eklenmemiştir; kontroller Swagger'daki **Shifts** bölümünden yapılır.
+Vardiyası olan personel, vardiya geçmişte olsa da silinemez (`409`). Foreign key doğrudan SQL ile silmeyi de engeller. Takvim arayüzü henüz eklenmemiştir; kontroller Swagger'daki **Shifts** bölümünden yapılır.
+
+### Tarih aralığına göre vardiya listesi
+
+`GET /api/shifts` için `from` ve `to` zorunludur. Tarihler ISO 8601 ve açık saat dilimi içermelidir; `to`, `from` sonrasında olmalı ve aralık en fazla 31 × 24 saat olmalıdır. Eksik/geçersiz/boş/ters veya daha uzun aralık `400` döndürür. Geçmiş vardiyalar da sorgulanabilir; personelin pasif olması liste kaydını gizlemez.
+
+| Query | Açıklama |
+| --- | --- |
+| from | Başlangıç anı, ör. `2099-01-02T00:00:00+03:00` |
+| to | Bitiş anı, ör. `2099-01-03T00:00:00+03:00` |
+| workforceUserId | Opsiyonel pozitif tam sayı; yalnızca bu personelin vardiyaları |
+| teamId | Opsiyonel pozitif tam sayı; personelin güncel ekibine göre filtre |
+
+Sorgu `[from, to)` aralığıyla gerçekten kesişen kayıtları döndürür: `shift.startAt < to AND shift.endAt > from`. Tam `from` anında biten veya tam `to` anında başlayan vardiya dahil edilmez. Önceki gün 23:00'te başlayıp ertesi gün 07:00'de biten vardiya her iki günün sorgusunda da görünür. Tarihler farklı saat farklarıyla gönderilse de aynı UTC anı üzerinden karşılaştırılır.
+
+Yanıt sayfalama zarfı olmadan doğrudan dizidir; sonuç yoksa `[]` döner. Kayıtlar `startAt ASC`, eşitlikte `id ASC` sırasındadır. Her vardiya kendi alanlarına ek olarak `workforceUser: { id, firstName, lastName, team: { id, name } | null }` içerir. Personel ve ekip tek SQL sorgusunda join ile yüklenir; her satır için ayrı sorgu atılmaz. Telefon, sicil, hesap şifresi/hash gibi alanlar listeye eklenmez.
+
+İki filtre birlikte verilirse AND ile uygulanır. Geçerli fakat eşleşmeyen personel/ekip ID'si `[]` döndürür. Ekibi olmayan personelin vardiyası filtresiz listede kalır; `team` null olur.
+
+**Ekip geçmişi sınırlaması:** Vardiyada o tarihteki ekip saklanmaz. Personel başka ekibe taşınırsa eski vardiyalar da yeni ekibin `teamId` filtresinde görünür; yanıttaki ekip de güncel ekiptir. Bu sorgu geçmiş ekip üyeliği raporu olarak kullanılmamalıdır.
+
+Swagger'da query alanlarına saat farkını doğrudan yazabilirsiniz. URL'yi elle kurarken `+03:00` içindeki `+` işaretini `%2B` olarak kodlayın veya `Z` kullanın; aksi halde `+` boşluk olarak çözümlenebilir.
 
 Yeni entity'ler eklenirken migration terminalden üretilir ve dosya içeriği gözden geçirilir. Mevcut veritabanıyla yalnızca yeni vardiya şemasının farkını oluşturmak için proje kökünde:
 
