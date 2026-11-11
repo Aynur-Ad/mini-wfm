@@ -1,9 +1,11 @@
+import type { CreateTeamShiftsDto } from './dto/create-team-shifts.dto.js';
+import { Team } from '../teams/entities/team.entity.js';
 import type { ShiftListItem } from './dto/shift-list-item.dto.js';
 import type { QueryShiftsDto } from './dto/query-shifts.dto.js';
 import { Injectable } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
 import { InjectRepository } from '@nestjs/typeorm';
-import { LessThan, MoreThan, Not } from 'typeorm';
+import { In, LessThan, MoreThan, Not } from 'typeorm';
 import type { EntityManager, Repository } from 'typeorm';
 import { Shift } from './entities/shift.entity.js';
 import { WorkforceUser } from '../workforce_users/entities/workforce_user.entity.js';
@@ -46,6 +48,83 @@ export class ShiftsService {
           createdById: actor.id,
         }),
       );
+    });
+  }
+
+  async createForTeam(
+    teamId: number,
+    dto: CreateTeamShiftsDto,
+  ): Promise<Shift[]> {
+    const actor = requestContext.getStore()?.actor;
+    if (!actor) fail(401, 'İşlemi yapan kullanıcı bilgisi eksik');
+    const startAt = new Date(dto.startAt);
+    const endAt = new Date(dto.endAt);
+    this.checkInterval(startAt, endAt);
+    return this.shifts.manager.transaction(async (manager) => {
+      // Üyelik işlemleri de önce ekip, sonra personel kilitler. Atama sırasında
+      // üyelik değişmesin; tekil vardiya işlemleriyle de aynı personel kilidi kullanılsın.
+      const team = await manager.getRepository(Team).findOne({
+        where: { id: teamId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!team) fail(404, 'Ekip bulunamadı');
+      if (!team.isActive) fail(409, 'Pasif ekibe vardiya atanamaz');
+      const members = await manager
+        .getRepository(WorkforceUser)
+        .createQueryBuilder('person')
+        .select([
+          'person.id',
+          'person.registrationNumber',
+          'person.firstName',
+          'person.lastName',
+        ])
+        .where('person.teamId = :teamId', { teamId })
+        .andWhere('person.isActive = :isActive', { isActive: true })
+        .orderBy('person.id', 'ASC')
+        .setLock('pessimistic_write')
+        .getMany();
+      if (members.length === 0) fail(409, 'Ekibin aktif üyesi bulunmuyor');
+      // Kilit beklenirken başlangıç geçmiş olabilir; yazmadan önce yeniden bakılır.
+      this.checkFuture(startAt);
+      const repository = manager.getRepository(Shift);
+      const conflicts = await repository.find({
+        select: { workforceUserId: true },
+        where: {
+          workforceUserId: In(members.map((member) => member.id)),
+          startAt: LessThan(endAt),
+          endAt: MoreThan(startAt),
+        },
+      });
+      if (conflicts.length > 0) {
+        const conflictingIds = new Set(
+          conflicts.map((shift) => shift.workforceUserId),
+        );
+        const details = members
+          .filter((member) => conflictingIds.has(member.id))
+          .map((member) => ({
+            workforceUserId: member.id,
+            registrationNumber: member.registrationNumber,
+            firstName: member.firstName,
+            lastName: member.lastName,
+          }));
+        throw new RpcException({
+          statusCode: 409,
+          message: 'Ekip üyelerinin mevcut vardiyalarıyla çakışma var',
+          details,
+        });
+      }
+      // Üye başına create() çağırmak ayrı transaction'lar açardı. Tüm kontrol ve
+      // kayıtlar aynı manager/repository ve tek transaction içinde tutulur.
+      const shifts = members.map((member) =>
+        repository.create({
+          workforceUserId: member.id,
+          startAt,
+          endAt,
+          note: dto.note ?? null,
+          createdById: actor.id,
+        }),
+      );
+      return repository.save(shifts);
     });
   }
 

@@ -220,7 +220,7 @@ pnpm --dir workforce-service test:int
 
 Normal `pnpm --dir workforce-service test` yalnızca unit testleri çalıştırır ve Docker gerektirmez. Entegrasyon testleri `src/test` altında `.int-spec.ts` uzantısıyla bulunur ve ayrı `vitest.config.int.ts` ayarıyla çalışır.
 
-Testler ekip adı tekilliğini, arama/sayfalamayı, üyelik/silme kurallarını, kullanıcı hesaplarını ve vardiya çakışmalarını kontrol eder. Vardiyalarda uç uca saatler, kendini hariç tutan güncelleme, paralel create/update ve personel silme FK kuralı da sınanır. Liste sorgusunda gece vardiyası, aralık sınırları, birlikte filtreleme, güncel ekip sınırlaması ve tek SELECT ile ilişkili verinin yüklenmesi doğrulanır. Migration'ların geri alınıp tekrar uygulanması ayrıca doğrulanır. Unit testlerden farklı olarak repository ve PostgreSQL bağlantısı gerçektir.
+Testler ekip adı tekilliğini, arama/sayfalamayı, üyelik/silme kurallarını, kullanıcı hesaplarını ve vardiya çakışmalarını kontrol eder. Vardiyalarda uç uca saatler, kendini hariç tutan güncelleme, paralel create/update ve personel silme FK kuralı da sınanır. Liste sorgusunda gece vardiyası, aralık sınırları, birlikte filtreleme, güncel ekip sınırlaması ve tek SELECT ile ilişkili verinin yüklenmesi doğrulanır. Toplu atamada tüm çakışan üyeler, pasif üyelerin hariç tutulması, eşzamanlı istekler ve DB hatasında hiçbir kayıt kalmaması da sınanır. Migration'ların geri alınıp tekrar uygulanması ayrıca doğrulanır. Unit testlerden farklı olarak repository ve PostgreSQL bağlantısı gerçektir.
 
 Geliştirme veritabanından bağımsızlığı doğrulamak için uygulamaları durdurup `docker compose stop postgres` çalıştırın; ardından `test:int` komutunu tekrar çalıştırın. Compose verileri korunur. Normal geliştirmeye dönmek için `docker compose up -d` kullanın.
 
@@ -288,6 +288,7 @@ Kimlik doğrulamadan sonra rol kontrolü yapılır. Token geçerli olduğu halde
 | Hesap oluşturma ve listeleme | Hayır | Hayır | Evet |
 | Vardiya listesi ve detayı | Evet | Evet | Evet |
 | Vardiya oluşturma, güncelleme ve silme | Hayır | Evet | Evet |
+| Ekibe toplu vardiya atama | Hayır | Evet | Evet |
 
 İzinler API controller'larında `@Roles(...)` ile tanımlanır. `JwtGuard` önce token'ı doğrular; ardından `RolesGuard` doğrulanan kullanıcının rolünü kontrol eder. `@Roles` tanımı olmayan endpoint'ler varsayılan olarak yalnızca admin'e açıktır. `@Public()` ile işaretli login ve health bu kontrolden muaftır. Hesap listesi GET olmasına rağmen yalnızca admin'e açıktır; yalnızca HTTP metoduna bakarak izin verilmez.
 
@@ -419,6 +420,7 @@ Vardiya bir personelin başlangıç ve bitiş anları arasındaki çalışma kay
 | Detay | GET `/api/shifts/:id` | ADMIN, PLANNER, VIEWER | 200 |
 | Kısmi güncelleme | PATCH `/api/shifts/:id` | ADMIN, PLANNER | 200 |
 | Silme | DELETE `/api/shifts/:id` | ADMIN, PLANNER | 204; gövdesiz |
+| Ekibe toplu atama | POST `/api/teams/:id/shifts` | ADMIN, PLANNER | 201; oluşturulan vardiya dizisi |
 
 `workforceUserId`, `startAt` ve `endAt` oluştururken zorunludur. Güncellemede yalnızca gönderilen alanlar değişir; `note: null` notu temizler. Tarihler saat dilimi belirtilmiş ISO 8601 olmalıdır: örneğin `2099-01-02T08:00:00+03:00` ve `2099-01-02T16:00:00+03:00`. Saat dilimi belirtilmemiş tarih kabul edilmez. Yanıt aynı anları UTC `Z` biçiminde döndürür; bu örnekte başlangıç `2099-01-02T05:00:00.000Z` olur. Ekranda yerel saate çevirme işi frontend'e aittir; API gösterim için üç saat eklemez.
 
@@ -427,6 +429,33 @@ Vardiya en az 1, en fazla 12 saat sürmelidir (`400`). Geçmişe ekleme veya ba�
 Aynı personelin aralıkları `mevcut.startAt < yeni.endAt && mevcut.endAt > yeni.startAt` ise çakışır. Örneğin 08:00–16:00 ile 12:00–20:00 çakışır; 16:00–22:00 çakışmaz. Çakışma yanıtı `409` ve çakışan vardiyanın UTC saatlerini içerir. Kendi saatleriyle güncellemede aynı vardiya çakışma sayılmaz. Personel satırı transaction içinde kilitlenerek eşzamanlı API yazmalarının kontrolü atlaması önlenir.
 
 Vardiyası olan personel, vardiya geçmişte olsa da silinemez (`409`). Foreign key doğrudan SQL ile silmeyi de engeller. Takvim arayüzü henüz eklenmemiştir; kontroller Swagger'daki **Shifts** bölümünden yapılır.
+
+### Ekibe toplu vardiya atama
+
+`POST /api/teams/:id/shifts` gövdesi `startAt`, `endAt` ve opsiyonel `note` alır. Üye ID'leri client'tan alınmaz; ekipteki tüm aktif personeller servis tarafından seçilir. Ekip yoksa `404`, pasifse veya aktif üyesi yoksa `409` döner. Tekil vardiyadaki ISO tarih/saat, 1–12 saat süre ve geçmişe eklememe kuralları burada da geçerlidir. Başarı yanıtı oluşturulan vardiyaların dizisidir; her kaydın `createdById` değeri doğrulanmış actor'dan gelir.
+
+Atama tek transaction içindedir. Üyelik işlemleriyle aynı sırada önce ekip, sonra personeller ID sırasıyla kilitlenir. Böylece üyelik değişiklikleri ve aynı personele tekil/toplu vardiya istekleriyle çakışma kontrolü korunur. Önce tüm aktif üyelerin çakışmaları kontrol edilir; biri bile çakışırsa hiçbir vardiya eklenmez. Pasif üyeler hem atamadan hem çakışma listesinden hariçtir.
+
+Çakışmada hata biçimi opsiyonel `details` alanını içerir:
+
+```json
+{
+  "statusCode": 409,
+  "message": "Ekip üyelerinin mevcut vardiyalarıyla çakışma var",
+  "details": [
+    {
+      "workforceUserId": 7,
+      "registrationNumber": "P007",
+      "firstName": "Deniz",
+      "lastName": "Kaya"
+    }
+  ]
+}
+```
+
+`details` tüm çakışan aktif üyeleri, personel başına tek kayıtla içerir; yalnızca ilk çakışma döndürülmez. Bu alanı taşımayan eski hatalar `{ statusCode, message }` biçiminde kalır. Şifre, token veya telefon gibi alanlar details'e eklenmez; details istek/hata loglarına yazılmaz.
+
+Swagger'da üç aktif üyeli bir ekip oluşturun. Bir üyeye tekil vardiya ekleyip aynı saatlere toplu atamayı deneyin: `409` ve ilgili personelin adı/sicili dönmeli. `GET /api/shifts` veya DBeaver'dan diğer üyelere hiçbir yeni kayıt yazılmadığını doğrulayın. Çakışmayan saatlerle deneyince aktif üye sayısı kadar vardiya ve `201` beklenir. Pasif üyeye vardiya eklenmemelidir.
 
 ### Tarih aralığına göre vardiya listesi
 

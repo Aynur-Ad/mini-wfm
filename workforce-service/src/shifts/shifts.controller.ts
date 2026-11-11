@@ -1,3 +1,4 @@
+import { CreateTeamShiftsDto } from './dto/create-team-shifts.dto.js';
 import { QueryShiftsDto } from './dto/query-shifts.dto.js';
 import { Controller } from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
@@ -12,6 +13,11 @@ export class ShiftsController {
   @MessagePattern('createShift')
   create(@Payload() dto: CreateShiftDto) {
     return this.shifts.create(dto);
+  }
+
+  @MessagePattern('createTeamShifts')
+  createForTeam(@Payload() dto: CreateTeamShiftsDto) {
+    return this.shifts.createForTeam(dto.teamId, dto);
   }
 
   @MessagePattern('findAllShifts')

@@ -403,4 +403,241 @@ describe('ShiftsService — gerçek PostgreSQL', () => {
       });
     });
   });
+  describe('Ekibe toplu vardiya — transaction', () => {
+    let team: Team;
+    let thirdId: number;
+    let inactiveId: number;
+    const bulk = (start = 8, end = 16) =>
+      requestContext.run(
+        {
+          correlationId: 'team-bulk-integration',
+          actor: {
+            id: adminId,
+            username: 'initial_admin',
+            role: AccountRole.ADMIN,
+          },
+        },
+        () =>
+          service.createForTeam(team.id, {
+            teamId: team.id,
+            startAt: stamp(start),
+            endAt: stamp(end),
+            note: 'Toplu test',
+          }),
+      );
+
+    beforeEach(async () => {
+      const people = database!.dataSource.getRepository(WorkforceUser);
+      team = await database!.dataSource
+        .getRepository(Team)
+        .save({ name: 'Toplu Vardiya Ekibi' });
+      await people.update(personId, { teamId: team.id });
+      await people.update(otherId, { teamId: team.id });
+      thirdId = (
+        await people.save({
+          firstName: 'Ali',
+          lastName: 'Yılmaz',
+          registrationNumber: 'SHIFT-C',
+          teamId: team.id,
+        })
+      ).id;
+      inactiveId = (
+        await people.save({
+          firstName: 'Can',
+          lastName: 'Işık',
+          registrationNumber: 'SHIFT-D',
+          teamId: team.id,
+          isActive: false,
+        })
+      ).id;
+    });
+
+    it('tüm aktif üyelere oluşturur, pasif üyeyi hariç tutar ve actor ID kullanır', async () => {
+      const result = await bulk();
+      expect(result.map((row) => row.workforceUserId)).toEqual([
+        personId,
+        otherId,
+        thirdId,
+      ]);
+      expect(
+        result.every(
+          (row) => row.createdById === adminId && row.note === 'Toplu test',
+        ),
+      ).toBe(true);
+      expect(
+        await database!.dataSource
+          .getRepository(Shift)
+          .countBy({ workforceUserId: inactiveId }),
+      ).toBe(0);
+      expect(await database!.dataSource.getRepository(Shift).count()).toBe(3);
+    });
+
+    it('bir üye çakışıyorsa diğer iki üyeye de hiçbir vardiya eklemez', async () => {
+      const previous = await create(8, 16, otherId);
+      await expect(bulk()).rejects.toMatchObject({
+        error: {
+          statusCode: 409,
+          details: [
+            {
+              workforceUserId: otherId,
+              registrationNumber: 'SHIFT-B',
+              firstName: 'Ece',
+              lastName: 'Ak',
+            },
+          ],
+        },
+      });
+      const rows = await database!.dataSource.getRepository(Shift).find();
+      expect(rows.map((row) => row.id)).toEqual([previous.id]);
+      expect(
+        await database!.dataSource
+          .getRepository(Shift)
+          .countBy({ workforceUserId: personId }),
+      ).toBe(0);
+      expect(
+        await database!.dataSource
+          .getRepository(Shift)
+          .countBy({ workforceUserId: thirdId }),
+      ).toBe(0);
+    });
+
+    it('bütün çakışan üyeleri döndürür; aynı kişinin iki vardiyası details kaydını çoğaltmaz', async () => {
+      await create(8, 10, personId);
+      await create(12, 14, personId);
+      await create(8, 16, thirdId);
+      await expect(bulk()).rejects.toMatchObject({
+        error: {
+          statusCode: 409,
+          details: [
+            {
+              workforceUserId: personId,
+              registrationNumber: 'SHIFT-A',
+              firstName: 'Deniz',
+              lastName: 'Kaya',
+            },
+            {
+              workforceUserId: thirdId,
+              registrationNumber: 'SHIFT-C',
+              firstName: 'Ali',
+              lastName: 'Yılmaz',
+            },
+          ],
+        },
+      });
+      expect(await database!.dataSource.getRepository(Shift).count()).toBe(3);
+      expect(
+        await database!.dataSource
+          .getRepository(Shift)
+          .countBy({ workforceUserId: otherId }),
+      ).toBe(0);
+    });
+
+    it('pasif üyenin çakışan eski vardiyası aktif üyelerin atamasını engellemez', async () => {
+      await database!.dataSource
+        .getRepository(Shift)
+        .insert({
+          workforceUserId: inactiveId,
+          createdById: adminId,
+          startAt: new Date(stamp(8)),
+          endAt: new Date(stamp(16)),
+        });
+      const result = await bulk();
+      expect(result).toHaveLength(3);
+      expect(
+        await database!.dataSource
+          .getRepository(Shift)
+          .countBy({ workforceUserId: inactiveId }),
+      ).toBe(1);
+    });
+
+    it('uç uca başlayan toplu vardiya çakışma sayılmaz', async () => {
+      await create(2, 8);
+      expect(await bulk(8, 16)).toHaveLength(3);
+      expect(await database!.dataSource.getRepository(Shift).count()).toBe(4);
+    });
+
+    it('pasif ekipte 409 verir ve hiç yazmaz', async () => {
+      await database!.dataSource
+        .getRepository(Team)
+        .update(team.id, { isActive: false });
+      await expect(bulk()).rejects.toMatchObject({
+        error: { statusCode: 409 },
+      });
+      expect(await database!.dataSource.getRepository(Shift).count()).toBe(0);
+    });
+
+    it.each(['empty', 'inactive'] as const)(
+      'aktif üye yoksa 409: %s',
+      async (kind) => {
+        await database!.dataSource
+          .getRepository(WorkforceUser)
+          .update(
+            { teamId: team.id },
+            kind === 'empty' ? { teamId: null } : { isActive: false },
+          );
+        await expect(bulk()).rejects.toMatchObject({
+          error: { statusCode: 409, message: 'Ekibin aktif üyesi bulunmuyor' },
+        });
+        expect(await database!.dataSource.getRepository(Shift).count()).toBe(0);
+      },
+    );
+
+    it('olmayan ekipte 404 verir', async () => {
+      team.id = 999999;
+      await expect(bulk()).rejects.toMatchObject({
+        error: { statusCode: 404 },
+      });
+    });
+
+    it('aynı ekibe paralel iki toplu istekte yalnızca tek tam atama kaydolur', async () => {
+      const results = await Promise.allSettled([bulk(), bulk()]);
+      expect(
+        results.filter((result) => result.status === 'fulfilled'),
+      ).toHaveLength(1);
+      const rejection = results.find((result) => result.status === 'rejected');
+      expect(rejection).toMatchObject({
+        reason: { error: { statusCode: 409, details: expect.any(Array) } },
+      });
+      expect(await database!.dataSource.getRepository(Shift).count()).toBe(3);
+    });
+
+    it('tekil atama ile yarışta toplu işlem ya tam yapılır ya da hiç yapılmaz', async () => {
+      const results = await Promise.allSettled([
+        bulk(),
+        create(8, 16, personId),
+      ]);
+      expect(
+        results.filter((result) => result.status === 'fulfilled'),
+      ).toHaveLength(1);
+      const total = await database!.dataSource.getRepository(Shift).count();
+      expect(total).toBe(results[0].status === 'fulfilled' ? 3 : 1);
+      const otherCount = await database!.dataSource
+        .getRepository(Shift)
+        .countBy({ workforceUserId: otherId });
+      expect(otherCount).toBe(results[0].status === 'fulfilled' ? 1 : 0);
+    });
+
+    it('kayıt aşamasında DB hatası olursa aktif üyelerin hiçbir kaydı kalmaz', async () => {
+      // Teste özel trigger yalnızca son üyede hata üretir. Önceki satırlar da korunmaz.
+      await database!.dataSource.query(
+        `CREATE FUNCTION workforce.reject_test_shift() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.workforce_user_id = ${thirdId} THEN RAISE EXCEPTION 'test insert failure'; END IF; RETURN NEW; END; $$`,
+      );
+      try {
+        await database!.dataSource.query(
+          'CREATE TRIGGER reject_test_shift BEFORE INSERT ON workforce.shift FOR EACH ROW EXECUTE FUNCTION workforce.reject_test_shift()',
+        );
+        await expect(bulk()).rejects.toMatchObject({
+          driverError: { code: 'P0001' },
+        });
+        expect(await database!.dataSource.getRepository(Shift).count()).toBe(0);
+      } finally {
+        await database!.dataSource.query(
+          'DROP TRIGGER IF EXISTS reject_test_shift ON workforce.shift',
+        );
+        await database!.dataSource.query(
+          'DROP FUNCTION workforce.reject_test_shift()',
+        );
+      }
+    });
+  });
 });
