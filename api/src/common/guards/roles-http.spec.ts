@@ -5,7 +5,7 @@ import { Test } from '@nestjs/testing';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import type { OpenAPIObject } from '@nestjs/swagger';
 import { randomBytes } from 'node:crypto';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import request from 'supertest';
 import {
   afterAll,
@@ -33,6 +33,18 @@ class DefaultPolicyController {
 const allRoles = Object.values(AccountRole);
 const adminOnly = [AccountRole.ADMIN];
 const routes = [
+  {
+    method: 'post',
+    path: '/teams/1/shifts',
+    pattern: 'createTeamShifts',
+    roles: [AccountRole.ADMIN, AccountRole.PLANNER],
+    status: 201,
+    body: {
+      startAt: '2099-01-02T08:00:00+03:00',
+      endAt: '2099-01-02T16:00:00+03:00',
+      note: 'Toplu',
+    },
+  },
   {
     method: 'get',
     path: '/shifts',
@@ -457,6 +469,71 @@ describe('HTTP rol izinleri — gerçek global guard ve controller akışı', ()
       expect(send).not.toHaveBeenCalled();
     },
   );
+
+  it('toplu vardiyada 409 details listesini HTTP yanıtına kayıpsız taşır', async () => {
+    const error = {
+      statusCode: 409,
+      message: 'Ekip üyelerinin mevcut vardiyalarıyla çakışma var',
+      details: [
+        {
+          workforceUserId: 1,
+          registrationNumber: 'P1',
+          firstName: 'Deniz',
+          lastName: 'Kaya',
+        },
+        {
+          workforceUserId: 2,
+          registrationNumber: 'P2',
+          firstName: 'Ece',
+          lastName: 'Ak',
+        },
+      ],
+    };
+    send.mockReturnValue(throwError(() => error));
+    const result = await request(app.getHttpServer())
+      .post('/api/teams/1/shifts')
+      .set('Authorization', `Bearer ${tokens.get(AccountRole.PLANNER)}`)
+      .send({
+        startAt: '2099-01-02T08:00:00+03:00',
+        endAt: '2099-01-02T16:00:00+03:00',
+      });
+    expect(result.status).toBe(409);
+    expect(result.body).toEqual(error);
+  });
+
+  it('toplu atamada üye/actor bilgisi bodyden alınmaz; teamId URLden gelir', async () => {
+    send.mockReturnValue(of([]));
+    const result = await request(app.getHttpServer())
+      .post('/api/teams/7/shifts')
+      .set('Authorization', `Bearer ${tokens.get(AccountRole.PLANNER)}`)
+      .send({
+        startAt: '2099-01-02T08:00:00+03:00',
+        endAt: '2099-01-02T16:00:00+03:00',
+        teamId: 999,
+        workforceUserId: 999,
+        memberIds: [999],
+        createdById: 999,
+        actor: { id: 999 },
+      });
+    expect(result.status).toBe(201);
+    expect(result.body).toEqual([]);
+    const envelope = send.mock.calls[0][1];
+    expect(envelope.actor).toEqual(users.get(AccountRole.PLANNER));
+    expect(envelope.data).toEqual({
+      teamId: 7,
+      startAt: '2099-01-02T08:00:00+03:00',
+      endAt: '2099-01-02T16:00:00+03:00',
+    });
+  });
+
+  it('toplu vardiya DTO hatasında servis çağrılmadan 400 döner', async () => {
+    const result = await request(app.getHttpServer())
+      .post('/api/teams/1/shifts')
+      .set('Authorization', `Bearer ${tokens.get(AccountRole.PLANNER)}`)
+      .send({ startAt: 'invalid' });
+    expect(result.status).toBe(400);
+    expect(send).not.toHaveBeenCalled();
+  });
 
   it('Swagger mevcut tüm endpointler için rolleri ve public istisnaları açıklar', () => {
     for (const route of routes) {

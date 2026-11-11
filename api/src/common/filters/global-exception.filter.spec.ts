@@ -123,4 +123,44 @@ describe('GlobalExceptionFilter', () => {
       /secret|hidden|5321234567/,
     );
   });
+  it.each(['direct', 'nested', 'http'] as const)(
+    '%s hata biçiminde opsiyonel details alanını korur',
+    (kind) => {
+      const details = [
+        {
+          workforceUserId: 7,
+          registrationNumber: 'P007',
+          firstName: 'Deniz',
+          lastName: 'Kaya',
+        },
+      ];
+      const error = { statusCode: 409, message: 'Çakışma var', details };
+      filter.catch(
+        kind === 'direct'
+          ? error
+          : kind === 'nested'
+            ? { error }
+            : new HttpException(error, 409),
+        host,
+      );
+      expect(response.json).toHaveBeenCalledWith(error);
+      expect(logError).not.toHaveBeenCalled();
+    },
+  );
+
+  it('beklenmeyen hata veya bağlantı hatasındaki details bilgisini sızdırmaz', () => {
+    filter.catch(
+      Object.assign(new Error('internal'), { details: ['private'] }),
+      host,
+    );
+    expect(response.json).toHaveBeenLastCalledWith({
+      statusCode: 500,
+      message: 'Beklenmeyen bir hata oluştu',
+    });
+    filter.catch({ code: 'ECONNREFUSED', details: ['private'] }, host);
+    expect(response.json).toHaveBeenLastCalledWith({
+      statusCode: 503,
+      message: 'Servise şu anda ulaşılamıyor',
+    });
+  });
 });

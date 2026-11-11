@@ -1,3 +1,5 @@
+import type { CreateTeamShiftsDto } from '../shifts/dto/create-team-shifts.dto.js';
+import type { ShiftResponseDto } from '../shifts/dto/shift-response.dto.js';
 import { Inject, Injectable } from '@nestjs/common';
 import { WorkforceClient } from '../common/clients/workforce-client.js';
 import { Observable } from 'rxjs';
@@ -34,6 +36,16 @@ export class TeamsService {
 
   remove(id: number): Observable<unknown> {
     return this.workforceClient.send('removeTeam', id);
+  }
+
+  createShifts(
+    teamId: number,
+    dto: CreateTeamShiftsDto,
+  ): Observable<ShiftResponseDto[]> {
+    return this.workforceClient.send(
+      'createTeamShifts',
+      Object.assign({}, dto, { teamId }),
+    );
   }
 
   addMember(

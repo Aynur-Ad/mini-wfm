@@ -1,3 +1,6 @@
+import { CreateTeamShiftsDto } from '../shifts/dto/create-team-shifts.dto.js';
+import { ShiftResponseDto } from '../shifts/dto/shift-response.dto.js';
+import { TeamShiftConflictDto } from '../shifts/dto/team-shift-conflict.dto.js';
 import { Roles } from '../common/decorators/roles.decorator.js';
 import { AccountRole } from '../accounts/account-role.js';
 import {
@@ -141,6 +144,33 @@ export class TeamsController {
   @ApiNotFoundResponse({ description: 'Ekip bulunamadı' })
   remove(@Param('id', ParseIntPipe) id: number): Observable<void> {
     return this.teamsService.remove(id).pipe(map(() => undefined));
+  }
+
+  @Post(':id/shifts')
+  @Roles(AccountRole.ADMIN, AccountRole.PLANNER)
+  @ApiOperation({
+    summary: 'Ekibin tüm aktif üyelerine aynı vardiyayı atar',
+    description:
+      'İzin verilen roller: ADMIN, PLANNER. Tek transaction: herhangi bir çakışmada hiç kayıt yazılmaz; details tüm çakışan personelleri içerir. Pasif üyelere atama yapılmaz.',
+  })
+  @ApiParam({ name: 'id', type: Number, example: 1 })
+  @ApiCreatedResponse({
+    type: ShiftResponseDto,
+    isArray: true,
+    description: 'Tüm aktif üyeler için oluşturulan vardiyalar',
+  })
+  @ApiBadRequestResponse({ description: 'Geçersiz ID, tarih veya süre' })
+  @ApiNotFoundResponse({ description: 'Ekip bulunamadı' })
+  @ApiConflictResponse({
+    type: TeamShiftConflictDto,
+    description:
+      'Pasif ekip, aktif üye yok, geçmiş tarih veya üye vardiyalarında çakışma',
+  })
+  createShifts(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: CreateTeamShiftsDto,
+  ) {
+    return this.teamsService.createShifts(id, dto);
   }
 
   @Post(':id/members')

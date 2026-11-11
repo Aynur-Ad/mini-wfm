@@ -32,6 +32,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 
     let statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
     let message: string | string[] = 'Beklenmeyen bir hata oluştu';
+    let details: unknown;
 
     const err = isRecord(exception) ? exception : undefined;
     const nestedError = isRecord(err?.error) ? err.error : undefined;
@@ -59,6 +60,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     ) {
       statusCode = Number(err.statusCode);
       message = err.message;
+      details = err.details;
     } else if (
       nestedError?.statusCode &&
       nestedError.message &&
@@ -66,6 +68,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     ) {
       statusCode = Number(nestedError.statusCode);
       message = nestedError.message;
+      details = nestedError.details;
     }
     // 3. API servisinin kendi HttpException hataları (örn. 400 ValidationPipe, 401, 403 vb.)
     else if (exception instanceof HttpException) {
@@ -75,6 +78,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       if (typeof res == 'string') {
         message = res;
       } else if (isRecord(res)) {
+        details = res.details;
         // NestJS varsayılan validation mesajları string array dönebilir.
         const responseMessage = res.message || res.error;
         if (isErrorMessage(responseMessage)) {
@@ -102,6 +106,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     const errorResponse = {
       statusCode,
       message,
+      ...(details === undefined ? {} : { details }),
     };
 
     response.status(statusCode).json(errorResponse);
