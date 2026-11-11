@@ -1,3 +1,5 @@
+import { vi } from 'vitest';
+import { Team } from '../teams/entities/team.entity.js';
 import {
   afterAll,
   afterEach,
@@ -230,14 +232,12 @@ describe('ShiftsService — gerçek PostgreSQL', () => {
     'DB CHECK doğrudan yazılan %s saatlik süreyi de reddeder',
     async (hours) => {
       await expect(
-        database!.dataSource
-          .getRepository(Shift)
-          .insert({
-            workforceUserId: personId,
-            createdById: adminId,
-            startAt: new Date(stamp(8)),
-            endAt: new Date(stamp(8 + hours)),
-          }),
+        database!.dataSource.getRepository(Shift).insert({
+          workforceUserId: personId,
+          createdById: adminId,
+          startAt: new Date(stamp(8)),
+          endAt: new Date(stamp(8 + hours)),
+        }),
       ).rejects.toMatchObject({
         driverError: { code: '23514', constraint: 'CHK_shift_duration' },
       });
@@ -253,14 +253,12 @@ describe('ShiftsService — gerçek PostgreSQL', () => {
     expect(await database!.dataSource.getRepository(Shift).count()).toBe(0);
   });
   it('başlamış vardiya geleceğe taşınamaz veya silinemez', async () => {
-    const item = await database!.dataSource
-      .getRepository(Shift)
-      .save({
-        workforceUserId: personId,
-        createdById: adminId,
-        startAt: new Date(Date.now() - 2 * HOUR),
-        endAt: new Date(Date.now() + 2 * HOUR),
-      });
+    const item = await database!.dataSource.getRepository(Shift).save({
+      workforceUserId: personId,
+      createdById: adminId,
+      startAt: new Date(Date.now() - 2 * HOUR),
+      endAt: new Date(Date.now() + 2 * HOUR),
+    });
     await expect(
       service.update(item.id, {
         id: item.id,
@@ -270,6 +268,139 @@ describe('ShiftsService — gerçek PostgreSQL', () => {
     ).rejects.toMatchObject({ error: { statusCode: 409 } });
     await expect(service.remove(item.id)).rejects.toMatchObject({
       error: { statusCode: 409 },
+    });
+  });
+  describe('Vardiya listesi', () => {
+    const list = (
+      from: number,
+      to: number,
+      filter: { workforceUserId?: number; teamId?: number } = {},
+    ) => service.findAll({ from: stamp(from), to: stamp(to), ...filter });
+
+    it.each([
+      [16, 20, false],
+      [4, 8, false],
+      [8, 16, true],
+      [9, 15, true],
+      [4, 12, true],
+      [12, 20, true],
+      [4, 20, true],
+    ])(
+      '[%s, %s) aralık sınırında beklenen dahil olma: %s',
+      async (from, to, included) => {
+        const item = await create(8, 16);
+        const result = await list(from, to);
+        expect(result.map((row) => row.id)).toEqual(included ? [item.id] : []);
+      },
+    );
+
+    it('23:00–07:00 vardiyasını her iki günün sorgusuna dahil eder', async () => {
+      const item = await create(23, 31);
+      expect((await list(0, 24)).map((row) => row.id)).toEqual([item.id]);
+      expect((await list(24, 48)).map((row) => row.id)).toEqual([item.id]);
+    });
+
+    it('startAt artan, eşitlikte ID artan sıralama uygular', async () => {
+      const late = await create(10, 18);
+      const early = await create(8, 9);
+      const sameStart = await create(8, 16, otherId);
+      expect((await list(0, 24)).map((row) => row.id)).toEqual([
+        early.id,
+        sameStart.id,
+        late.id,
+      ]);
+    });
+
+    it('personel ve ekip filtrelerini ayrı ayrı ve birlikte AND ile uygular', async () => {
+      const teams = database!.dataSource.getRepository(Team);
+      const a = await teams.save({ name: 'Sorgu Ekibi A' });
+      const b = await teams.save({ name: 'Sorgu Ekibi B' });
+      const people = database!.dataSource.getRepository(WorkforceUser);
+      await people.update(personId, { teamId: a.id });
+      await people.update(otherId, { teamId: b.id });
+      const first = await create();
+      const second = await create(8, 16, otherId);
+      expect(
+        (await list(0, 24, { teamId: a.id })).map((row) => row.id),
+      ).toEqual([first.id]);
+      expect(
+        (await list(0, 24, { workforceUserId: otherId })).map((row) => row.id),
+      ).toEqual([second.id]);
+      expect(
+        (await list(0, 24, { workforceUserId: personId, teamId: a.id })).map(
+          (row) => row.id,
+        ),
+      ).toEqual([first.id]);
+      expect(
+        await list(0, 24, { workforceUserId: personId, teamId: b.id }),
+      ).toEqual([]);
+    });
+
+    it('ekibi olmayan personeli kaybetmez, ekip alanını null döndürür', async () => {
+      await create();
+      const result = await list(0, 24);
+      expect(result[0].workforceUser).toMatchObject({
+        id: personId,
+        firstName: 'Deniz',
+        lastName: 'Kaya',
+        team: null,
+      });
+      expect(Object.keys(result[0].workforceUser).sort()).toEqual([
+        'firstName',
+        'id',
+        'lastName',
+        'team',
+      ]);
+    });
+
+    it('ekip değiştirilince eski vardiya da güncel ekip filtresine geçer', async () => {
+      const teams = database!.dataSource.getRepository(Team);
+      const a = await teams.save({ name: 'Önceki Ekip' });
+      const b = await teams.save({ name: 'Güncel Ekip' });
+      const people = database!.dataSource.getRepository(WorkforceUser);
+      await people.update(personId, { teamId: a.id });
+      const item = await create();
+      await people.update(personId, { teamId: b.id });
+      expect(await list(0, 24, { teamId: a.id })).toEqual([]);
+      const result = await list(0, 24, { teamId: b.id });
+      expect(result.map((row) => row.id)).toEqual([item.id]);
+      expect(result[0].workforceUser.team).toEqual({ id: b.id, name: b.name });
+    });
+
+    it('personel pasife alınsa da kayıtlı vardiyaları listeler', async () => {
+      const item = await create();
+      await database!.dataSource
+        .getRepository(WorkforceUser)
+        .update(personId, { isActive: false });
+      expect((await list(0, 24)).map((row) => row.id)).toEqual([item.id]);
+    });
+
+    it('çok kayıt olsa da liste, personel ve ekip için tek SELECT çalıştırır', async () => {
+      await create(8, 16);
+      await create(16, 22);
+      await create(8, 16, otherId);
+      const spy = vi.spyOn(database!.dataSource.logger, 'logQuery');
+      try {
+        const result = await list(0, 24);
+        expect(result).toHaveLength(3);
+        expect(spy).toHaveBeenCalledTimes(1);
+        expect(spy.mock.calls[0][0]).toContain('JOIN');
+      } finally {
+        spy.mockRestore();
+      }
+    });
+
+    it('tam 31 günü kabul eder, 31 gün + 1 ms ve 40 günü reddeder', async () => {
+      await expect(list(0, 31 * 24)).resolves.toEqual([]);
+      await expect(
+        service.findAll({
+          from: stamp(0),
+          to: new Date(base + 31 * 24 * HOUR + 1).toISOString(),
+        }),
+      ).rejects.toMatchObject({ error: { statusCode: 400 } });
+      await expect(list(0, 40 * 24)).rejects.toMatchObject({
+        error: { statusCode: 400 },
+      });
     });
   });
 });

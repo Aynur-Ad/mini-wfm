@@ -1,3 +1,5 @@
+import type { QueryShiftsDto } from './dto/query-shifts.dto.js';
+import type { ShiftListItemDto } from './dto/shift-list-item.dto.js';
 import { Inject, Injectable } from '@nestjs/common';
 import { WorkforceClient } from '../common/clients/workforce-client.js';
 import type { CreateShiftDto } from './dto/create-shift.dto.js';
@@ -11,6 +13,9 @@ export class ShiftsService {
   ) {}
   create(dto: CreateShiftDto) {
     return this.client.send<ShiftResponseDto>('createShift', dto);
+  }
+  findAll(query: QueryShiftsDto) {
+    return this.client.send<ShiftListItemDto[]>('findAllShifts', query);
   }
   findOne(id: number) {
     return this.client.send<ShiftResponseDto>('findOneShift', id);
