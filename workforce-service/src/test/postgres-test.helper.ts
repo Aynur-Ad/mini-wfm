@@ -1,4 +1,5 @@
 /// <reference types="vite/client" />
+import { Shift } from '../shifts/entities/shift.entity.js';
 import 'reflect-metadata';
 import { Account } from '../accounts/entities/account.entity.js';
 import { AccountRole } from '../accounts/account-role.js';
@@ -48,7 +49,7 @@ export async function startPostgresTestDatabase(): Promise<PostgresTestDatabase>
     password: container.getPassword(),
     database: container.getDatabase(),
     namingStrategy: new SnakeNamingStrategy(),
-    entities: [Team, WorkforceUser, Account],
+    entities: [Team, WorkforceUser, Account, Shift],
     migrations: Object.values(migrationModules).flatMap(Object.values),
     migrationsRun: false,
     synchronize: false,

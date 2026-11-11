@@ -145,6 +145,7 @@ export class WorkforceUsersController {
   @Delete(':id')
   @Roles(AccountRole.ADMIN)
   @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiConflictResponse({ description: 'Vardiyası olan personel silinemez' })
   @ApiOperation({
     summary: 'Personeli kalıcı olarak siler',
     description: 'İzin verilen roller: ADMIN.',

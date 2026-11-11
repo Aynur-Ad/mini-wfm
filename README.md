@@ -220,7 +220,7 @@ pnpm --dir workforce-service test:int
 
 Normal `pnpm --dir workforce-service test` yalnızca unit testleri çalıştırır ve Docker gerektirmez. Entegrasyon testleri `src/test` altında `.int-spec.ts` uzantısıyla bulunur ve ayrı `vitest.config.int.ts` ayarıyla çalışır.
 
-Testler ekip adı tekilliğini, büyük/küçük harf duyarsız aramayı, sayfalama ve toplam kayıt sayısını, ekip üyeliği/silme kurallarını ve migration'ların geri alınıp tekrar uygulanmasını kontrol eder. Unit testlerden farklı olarak repository ve PostgreSQL bağlantısı gerçektir.
+Testler ekip adı tekilliğini, arama/sayfalamayı, üyelik/silme kurallarını, kullanıcı hesaplarını ve vardiya çakışmalarını kontrol eder. Vardiyalarda uç uca saatler, kendini hariç tutan güncelleme, paralel create/update ve personel silme FK kuralı da sınanır. Migration'ların geri alınıp tekrar uygulanması ayrıca doğrulanır. Unit testlerden farklı olarak repository ve PostgreSQL bağlantısı gerçektir.
 
 Geliştirme veritabanından bağımsızlığı doğrulamak için uygulamaları durdurup `docker compose stop postgres` çalıştırın; ardından `test:int` komutunu tekrar çalıştırın. Compose verileri korunur. Normal geliştirmeye dönmek için `docker compose up -d` kullanın.
 
@@ -286,12 +286,14 @@ Kimlik doğrulamadan sonra rol kontrolü yapılır. Token geçerli olduğu halde
 | Ekip ve personel oluşturma, güncelleme, silme | Hayır | Hayır | Evet |
 | Ekip üyeliği ekleme ve kaldırma | Hayır | Hayır | Evet |
 | Hesap oluşturma ve listeleme | Hayır | Hayır | Evet |
+| Vardiya detayı | Evet | Evet | Evet |
+| Vardiya oluşturma, güncelleme ve silme | Hayır | Evet | Evet |
 
 İzinler API controller'larında `@Roles(...)` ile tanımlanır. `JwtGuard` önce token'ı doğrular; ardından `RolesGuard` doğrulanan kullanıcının rolünü kontrol eder. `@Roles` tanımı olmayan endpoint'ler varsayılan olarak yalnızca admin'e açıktır. `@Public()` ile işaretli login ve health bu kontrolden muaftır. Hesap listesi GET olmasına rağmen yalnızca admin'e açıktır; yalnızca HTTP metoduna bakarak izin verilmez.
 
 Swagger'da admin hesabıyla giriş yapıp bir `VIEWER` ve bir `PLANNER` hesabı oluşturun. Her hesap için login'den token alın; Authorize içindeki önceki token'ı değiştirin. Viewer ekip listesini okuyabilmeli, ekip oluştururken `403` almalıdır. Planner da ekip/personel kayıtlarını okuyabilir; bunları değiştiremez ve hesap listesini göremez. Admin tüm mevcut işlemleri kullanabilir. Swagger endpoint açıklamaları izin verilen rolleri gösterir.
 
-Butonları arayüzde gizlemek doğrudan HTTP isteği gönderilmesini engellemez. İzin kontrolü backend'de yapılır ve yetkisiz istek workforce-service'e iletilmez. Vardiya, iş emri ve rapor endpoint'leri eklendiğinde kendi izinleri ayrıca tanımlanacaktır.
+Butonları arayüzde gizlemek doğrudan HTTP isteği gönderilmesini engellemez. İzin kontrolü backend'de yapılır ve yetkisiz istek workforce-service'e iletilmez. İş emri ve rapor endpoint'leri eklendiğinde kendi izinleri ayrıca tanımlanacaktır.
 
 ### Servisler arasında kullanıcı bilgisi
 
@@ -406,6 +408,34 @@ Workforce-service'teki `validateCredentials` TCP mesajı kullanıcı adı ve şi
 
 Entegrasyon testleri hesap tablosunu ve ilk yönetici migration'ını da kapsar. Test yönetici şifresi rastgele üretilir; gerçek `.env` kullanılmaz. Her testten sonra hesaplar temizlenir ve test yöneticisi yeniden oluşturularak aynı başlangıç durumu korunur.
 
+## Vardiya işlemleri
+
+Vardiya bir personelin başlangıç ve bitiş anları arasındaki çalışma kaydıdır. `workforce.shift` tablosunda personel ID, başlangıç/bitiş, en fazla 500 karakterlik not ve oluşturan hesap tutulur. Oluşturan hesap istek gövdesinden değil, doğrulanmış TCP `actor` bilgisinden alınır. Güncellemede `createdById` korunur.
+
+| İşlem | Endpoint | İzin verilen roller | Başarı |
+| --- | --- | --- | --- |
+| Oluşturma | POST `/api/shifts` | ADMIN, PLANNER | 201 |
+| Detay | GET `/api/shifts/:id` | ADMIN, PLANNER, VIEWER | 200 |
+| Kısmi güncelleme | PATCH `/api/shifts/:id` | ADMIN, PLANNER | 200 |
+| Silme | DELETE `/api/shifts/:id` | ADMIN, PLANNER | 204; gövdesiz |
+
+`workforceUserId`, `startAt` ve `endAt` oluştururken zorunludur. Güncellemede yalnızca gönderilen alanlar değişir; `note: null` notu temizler. Tarihler saat dilimi belirtilmiş ISO 8601 olmalıdır: örneğin `2099-01-02T08:00:00+03:00` ve `2099-01-02T16:00:00+03:00`. Saat dilimi belirtilmemiş tarih kabul edilmez. Yanıt aynı anları UTC `Z` biçiminde döndürür; bu örnekte başlangıç `2099-01-02T05:00:00.000Z` olur. Ekranda yerel saate çevirme işi frontend'e aittir; API gösterim için üç saat eklemez.
+
+Vardiya en az 1, en fazla 12 saat sürmelidir (`400`). Geçmişe ekleme veya başlangıcı geçmiş vardiyayı güncelleme/silme `409` döndürür; başlamış vardiya geleceğe taşınarak bu kural aşılamaz. Personel yoksa `404`, hedef personel pasifse `409` döner. Pasif personele ait vardiyayı silmek için de önce personelin aktif olması gerekir.
+
+Aynı personelin aralıkları `mevcut.startAt < yeni.endAt && mevcut.endAt > yeni.startAt` ise çakışır. Örneğin 08:00–16:00 ile 12:00–20:00 çakışır; 16:00–22:00 çakışmaz. Çakışma yanıtı `409` ve çakışan vardiyanın UTC saatlerini içerir. Kendi saatleriyle güncellemede aynı vardiya çakışma sayılmaz. Personel satırı transaction içinde kilitlenerek eşzamanlı API yazmalarının kontrolü atlaması önlenir.
+
+Vardiyası olan personel, vardiya geçmişte olsa da silinemez (`409`). Foreign key doğrudan SQL ile silmeyi de engeller. Vardiya listeleme endpoint'i ve takvim arayüzü henüz eklenmemiştir; kontroller Swagger'daki **Shifts** bölümünden yapılır.
+
+Yeni entity'ler eklenirken migration terminalden üretilir ve dosya içeriği gözden geçirilir. Mevcut veritabanıyla yalnızca yeni vardiya şemasının farkını oluşturmak için proje kökünde:
+
+```powershell
+pnpm --dir workforce-service migration:generate src/migrations/CreateShiftTable
+pnpm --dir workforce-service typeorm migration:run -d ./src/data-source.ts
+```
+
+Bu üretim komutu ilgili migration henüz yokken geliştirme sırasında bir kez kullanılır. Depodaki migration dosyaları zaten mevcutsa her kurulumda yeniden üretilmez; workforce-service açılışta bekleyen migration'ları uygular. Entegrasyon testleri gerçek migration dosyalarını boş bir Testcontainers veritabanına uygular; `synchronize` kullanılmaz.
+
 ## Veritabanını inceleme
 
 DBeaver gibi bir araç için yerel bağlantı bilgileri:
@@ -418,7 +448,7 @@ DBeaver gibi bir araç için yerel bağlantı bilgileri:
 | User | postgres |
 | Password | mysecretpassword |
 
-Migration'lar çalıştıktan sonra `workforce` şemasında `team` ve `workforce_user` tabloları görünür.
+Migration'lar çalıştıktan sonra `workforce` şemasında `team`, `workforce_user`, `account` ve `shift` tabloları görünür.
 
 ## Durdurma
 
@@ -434,6 +464,7 @@ Volume silinmediği için veriler korunur.
 
 | Durum | Kontrol |
 | --- | --- |
+| API 403 dönüyor | /api/auth/me ile aktif rolü kontrol edin; Swagger Authorize alanında doğru hesabın tokenı olmalı. |
 | API 401 dönüyor | Giriş yapın; Swagger Authorize alanındaki tokenı ve geçerlilik süresini kontrol edin. |
 | API 503 dönüyor | Workforce service açık mı ve 4001 portunu dinliyor mu? |
 | Veritabanına bağlanılamıyor | Docker Desktop, container durumu ve `workforce-service/.env` değerlerini kontrol edin. |

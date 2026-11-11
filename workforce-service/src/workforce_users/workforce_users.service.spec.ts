@@ -1,3 +1,4 @@
+import { Shift } from '../shifts/entities/shift.entity.js';
 import { HttpStatus } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
 import { Test } from '@nestjs/testing';
@@ -44,6 +45,7 @@ function duplicateKeyError() {
 describe('WorkforceUsersService', () => {
   let service: WorkforceUsersService;
   let current: WorkforceUser;
+  const shiftRepository = { existsBy: vi.fn() };
   const teamRepository = { findOne: vi.fn() };
   const repository = {
     findOne: vi.fn(),
@@ -57,11 +59,16 @@ describe('WorkforceUsersService', () => {
   beforeEach(async () => {
     vi.resetAllMocks();
     current = person();
+    shiftRepository.existsBy.mockResolvedValue(false);
     repository.manager.transaction.mockImplementation(
       (work: (manager: unknown) => unknown) =>
         work({
           getRepository: (entity: unknown) =>
-            entity === Team ? teamRepository : repository,
+            entity === Team
+              ? teamRepository
+              : entity === Shift
+                ? shiftRepository
+                : repository,
         }),
     );
     const module = await Test.createTestingModule({
@@ -376,6 +383,35 @@ describe('WorkforceUsersService', () => {
   });
 
   describe('remove', () => {
+    it('vardiyası varsa personeli 409 ile korur', async () => {
+      repository.findOne.mockResolvedValue(current);
+      shiftRepository.existsBy.mockResolvedValue(true);
+      await expect(service.remove(10)).rejects.toMatchObject({
+        error: {
+          statusCode: 409,
+          message: 'Vardiyası olan personel silinemez',
+        },
+      });
+      expect(repository.remove).not.toHaveBeenCalled();
+    });
+
+    it('FK yarışını da 409 olarak döndürür', async () => {
+      repository.findOne.mockResolvedValue(current);
+      repository.remove.mockRejectedValue(
+        new QueryFailedError(
+          'DELETE',
+          [],
+          Object.assign(new Error('fk'), {
+            code: '23503',
+            constraint: 'FK_shift_workforce_user',
+          }),
+        ),
+      );
+      await expect(service.remove(10)).rejects.toMatchObject({
+        error: { statusCode: 409 },
+      });
+    });
+
     it('mevcut personeli siler ve mevcut TCP yanıt biçimini korur', async () => {
       repository.findOne.mockResolvedValue(current);
       repository.remove.mockResolvedValue(current);

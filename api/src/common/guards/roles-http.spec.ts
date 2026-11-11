@@ -34,6 +34,41 @@ const allRoles = Object.values(AccountRole);
 const adminOnly = [AccountRole.ADMIN];
 const routes = [
   {
+    method: 'post',
+    path: '/shifts',
+    pattern: 'createShift',
+    roles: [AccountRole.ADMIN, AccountRole.PLANNER],
+    status: 201,
+    body: {
+      workforceUserId: 1,
+      startAt: '2099-01-02T05:00:00Z',
+      endAt: '2099-01-02T13:00:00Z',
+    },
+  },
+  {
+    method: 'get',
+    path: '/shifts/1',
+    pattern: 'findOneShift',
+    roles: allRoles,
+    status: 200,
+  },
+  {
+    method: 'patch',
+    path: '/shifts/1',
+    pattern: 'updateShift',
+    roles: [AccountRole.ADMIN, AccountRole.PLANNER],
+    status: 200,
+    body: { note: null },
+  },
+  {
+    method: 'delete',
+    path: '/shifts/1',
+    pattern: 'removeShift',
+    roles: [AccountRole.ADMIN, AccountRole.PLANNER],
+    status: 204,
+  },
+
+  {
     method: 'get',
     path: '/teams',
     pattern: 'findAllTeams',
@@ -328,6 +363,50 @@ describe('HTTP rol izinleri — gerçek global guard ve controller akışı', ()
       expect.objectContaining({ actor: null }),
     );
   });
+
+  it('vardiya create gövdesindeki actor/createdById silinir; token kimliği TCP zarfında kalır', async () => {
+    const result = await request(app.getHttpServer())
+      .post('/api/shifts')
+      .set('Authorization', `Bearer ${tokens.get(AccountRole.PLANNER)}`)
+      .send({
+        workforceUserId: 1,
+        startAt: '2099-01-02T08:00:00+03:00',
+        endAt: '2099-01-02T16:00:00+03:00',
+        createdById: 999,
+        actor: { id: 999 },
+      });
+    expect(result.status).toBe(201);
+    const envelope = send.mock.calls[0][1];
+    expect(envelope.actor).toEqual(users.get(AccountRole.PLANNER));
+    expect(envelope.data).not.toHaveProperty('createdById');
+    expect(envelope.data).not.toHaveProperty('actor');
+  });
+
+  it.each([
+    [
+      'post',
+      {
+        workforceUserId: 1,
+        startAt: '2099-01-02T08:00:00',
+        endAt: '2099-01-02T16:00:00Z',
+      },
+    ],
+    ['patch', { startAt: null }],
+    ['patch', { workforceUserId: null }],
+  ] as const)(
+    'vardiya %s geçersiz DTO ile TCP çağrısından önce 400 verir',
+    async (method, body) => {
+      const result = await call(
+        app,
+        method,
+        method === 'post' ? '/api/shifts' : '/api/shifts/1',
+      )
+        .set('Authorization', `Bearer ${tokens.get(AccountRole.PLANNER)}`)
+        .send(body);
+      expect(result.status).toBe(400);
+      expect(send).not.toHaveBeenCalled();
+    },
+  );
 
   it('Swagger mevcut tüm endpointler için rolleri ve public istisnaları açıklar', () => {
     for (const route of routes) {
