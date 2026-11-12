@@ -291,6 +291,9 @@ Kimlik doğrulamadan sonra rol kontrolü yapılır. Token geçerli olduğu halde
 | Ekibe toplu vardiya atama | Hayır | Evet | Evet |
 | İş emri detayı | Evet | Evet | Evet |
 | İş emri oluşturma ve güncelleme | Hayır | Evet | Evet |
+| İş emri durum değiştirme | Hayır | Evet | Evet |
+| Devam eden iş emrini iptal etme | Hayır | Hayır | Evet |
+| İş emri durum geçmişi | Evet | Evet | Evet |
 
 İzinler API controller'larında `@Roles(...)` ile tanımlanır. `JwtGuard` önce token'ı doğrular; ardından `RolesGuard` doğrulanan kullanıcının rolünü kontrol eder. `@Roles` tanımı olmayan endpoint'ler varsayılan olarak yalnızca admin'e açıktır. `@Public()` ile işaretli login ve health bu kontrolden muaftır. Hesap listesi GET olmasına rağmen yalnızca admin'e açıktır; yalnızca HTTP metoduna bakarak izin verilmez.
 
@@ -498,12 +501,14 @@ Bu üretim komutu ilgili migration henüz yokken geliştirme sırasında bir kez
 | Oluşturma | POST `/api/work-orders` | ADMIN, PLANNER | 201 |
 | Detay | GET `/api/work-orders/:id` | ADMIN, PLANNER, VIEWER | 200 |
 | Kısmi güncelleme | PATCH `/api/work-orders/:id` | ADMIN, PLANNER | 200 |
+| Durum değiştirme | PATCH `/api/work-orders/:id/status` | ADMIN, PLANNER; devam eden işi iptal yalnız ADMIN | 200 |
+| Durum geçmişi | GET `/api/work-orders/:id/history` | ADMIN, PLANNER, VIEWER | 200; dizi |
 
 Başlık zorunludur, kırpılır ve en fazla 200 karakter olabilir. Açıklama opsiyoneldir, `null` ile temizlenebilir. Öncelik `LOW`, `MEDIUM`, `HIGH`, `URGENT` değerlerinden biridir. `dueAt` saat dilimi belirtilmiş ISO 8601 olmalı ve oluşturma/gönderilen yeni son tarihte geçmişte olmamalıdır (`400`). Tarihler UTC `Z` biçiminde döner.
 
 Kod `IE-2026-00001` biçimindedir. PostgreSQL'in `SERIAL` ID alanı için oluşturduğu sequence'ten `nextval` alınır ve aynı sayı ID ile kodda kullanılır. Paralel isteklerde `MAX(id)+1` hesabı yapılmaz. Sayı en az beş hanelidir; 99999 sonrasında kırpılmaz ve yıl değişiminde sıfırlanmaz. Kodun yıl bölümü sunucunun yerel ayarından bağımsız olarak UTC yılıdır. Sequence rollback ile geri alınmaz; hata sonrası numara boşlukları normaldir, aralıksız numaralandırma vaat edilmez.
 
-PATCH yalnızca `title`, `description`, `priority`, `dueAt` alanlarını kabul eder. Gönderilen `status`, `teamId`, `code`, `createdById` ve `version` alanları whitelist tarafından kaldırılır; servis de yalnız izinli alanları uygular. `COMPLETED` veya `CANCELLED` iş emri güncellenemez (`409`). Durum ve ekip atama akışı henüz eklenmemiştir. `version` alanı 1'den başlar; kayıt güncellendiğinde artar, istemcinin sürümünü kontrol etme kuralı henüz uygulanmaz.
+PATCH yalnızca `title`, `description`, `priority`, `dueAt` alanlarını kabul eder. Gönderilen `status`, `teamId`, `code`, `createdById` ve `version` alanları whitelist tarafından kaldırılır; servis de yalnız izinli alanları uygular. `COMPLETED` veya `CANCELLED` iş emri güncellenemez (`409`). Durum ve ekip ataması ayrı `/status` ucu üzerinden yapılır. `version` alanı 1'den başlar; kayıt güncellendiğinde artar, istemcinin sürümünü kontrol etme kuralı henüz uygulanmaz.
 
 İş emri silme endpoint'i yoktur; geçmiş korunur. Açık iş emrine bağlı ekip üyesiz olsa da silinemez (`409`). B12 gereği kapanmış bağlı iş emri geçmişi de RESTRICT foreign key ile korunur; böyle bir ekipte de `409` döner.
 
@@ -515,6 +520,37 @@ pnpm --dir workforce-service typeorm migration:run -d ./src/data-source.ts
 ```
 
 `id SERIAL` tanımı sequence'i otomatik oluşturur; ayrıca elle CREATE SEQUENCE eklemek gerekmez. Migration dosyası depoda zaten varsa yeniden üretilmez. Swagger **WorkOrders** bölümünden başlık, gelecek bir son tarih ve opsiyonel açıklama/öncelikle deneyebilirsiniz.
+
+### Durum geçişleri ve geçmiş
+
+Durum değiştirme gövdesi `status`, opsiyonel `teamId` ve opsiyonel `reason` alır. İptalde neden zorunludur, kırpıldıktan sonra boş olamaz ve en fazla 500 karakterdir. Atamada ekip ID zorunludur; diğer hedeflere gönderilen ekip ID durumun kendi kuralını değiştirmez.
+
+| Mevcut durum | Hedef | Ek kural |
+| --- | --- | --- |
+| OPEN | ASSIGNED | Ekip aktif ve en az bir aktif üyeli olmalı |
+| OPEN | CANCELLED | reason zorunlu |
+| ASSIGNED | IN_PROGRESS | Ekip korunur |
+| ASSIGNED | OPEN | Atama geri alınır; teamId null olur |
+| ASSIGNED | CANCELLED | reason zorunlu; ekip korunur |
+| IN_PROGRESS | COMPLETED | Ekip korunur |
+| IN_PROGRESS | CANCELLED | reason zorunlu; yalnız ADMIN |
+
+Diğer tüm geçişler `409` ve Türkçe durum adlarıyla açıklama döndürür. Kurallar worker'da `work-orders/rules/status-transitions.ts` dosyasındadır. State'e bağlı rol kontrolü API'de yapılır. API'nin kontrol ettiği durum transaction içinde tekrar karşılaştırılır; arada durum değiştiyse işlem `409` ile durur. Bu dahili `expectedStatus` istemciden alınmaz; istemci version kontrolü ayrı bir geliştirme adımıdır.
+
+İş emrini oluşturma da ilk geçmiş satırını `fromStatus: null`, `toStatus: OPEN` olarak ekler. Sonraki değişiklikler `workforce.work_order_status_history` tablosuna önceki/yeni durum, işlem sonrası ekip, neden, değiştiren hesap ve zamanla yazılır. İş emri güncellemesi ve geçmiş ekleme tek transaction'dadır; geçmiş yazılamazsa durum/version/ekip de geri alınır. İlk geçmiş yazılamazsa iş emri oluşturma da geri alınır.
+
+Geçmiş ucu `changedAt ASC`, eşitlikte `id ASC` sırasıyla dizi döndürür. `changedBy` özeti yalnız `id` ve `username` içerir. Tarihler UTC Z biçimindedir. Bu özellik eklenmeden önce var olan iş emirleri için geriye dönük hayali geçmiş oluşturulmaz; yeni iş emirlerinde ilk satır, eski kayıtlarda bu aşamadan sonraki değişiklikler kaydedilir.
+
+**Ekip aktifliği/üyelik kararı — mentor teyidi bekliyor:** Aktif ekip ve aktif üye kontrolü atama anında yapılır. Sonradan ekip pasifleştirilirse veya üyeleri ayrılırsa iş emrinin durumu otomatik değiştirilmez; mevcut iş emri başlatılabilir, tamamlanabilir veya izinli şekilde iptal edilebilir. Bu başlangıç kararı mentorla görüşülerek kesinleştirilmelidir; henüz mentor tarafından onaylandığı varsayılmaz. Açık iş emrinin ekip silme koruması sürer. Atama geri alınmış olsa bile geçmişte ekibe referans varsa B12 ve RESTRICT nedeniyle ekip silinemez (`409`).
+
+Yeni geçmiş entity'sinin migration'ını geliştirme sırasında bir kez terminalden üretip inceleyin:
+
+```powershell
+pnpm --dir workforce-service migration:generate src/migrations/CreateWorkOrderStatusHistory
+pnpm --dir workforce-service typeorm migration:run -d ./src/data-source.ts
+```
+
+Bu migration yeni geçmiş tablosu, üç foreign key ve iş emri/zaman indeksini içerir. Önceki iş emri veya hesap enumlarının değiştirilmesi bu işin kapsamı değildir.
 
 ## Veritabanını inceleme
 
@@ -528,7 +564,7 @@ DBeaver gibi bir araç için yerel bağlantı bilgileri:
 | User | postgres |
 | Password | mysecretpassword |
 
-Migration'lar çalıştıktan sonra `workforce` şemasında `team`, `workforce_user`, `account`, `shift` ve `work_order` tabloları görünür.
+Migration'lar çalıştıktan sonra `workforce` şemasında `team`, `workforce_user`, `account`, `shift`, `work_order` ve `work_order_status_history` tabloları görünür.
 
 ## Durdurma
 

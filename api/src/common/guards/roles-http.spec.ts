@@ -34,6 +34,21 @@ const allRoles = Object.values(AccountRole);
 const adminOnly = [AccountRole.ADMIN];
 const routes = [
   {
+    method: 'patch',
+    path: '/work-orders/1/status',
+    pattern: 'changeWorkOrderStatus',
+    roles: [AccountRole.ADMIN, AccountRole.PLANNER],
+    status: 200,
+    body: { status: 'ASSIGNED', teamId: 1 },
+  },
+  {
+    method: 'get',
+    path: '/work-orders/1/history',
+    pattern: 'findWorkOrderHistory',
+    roles: allRoles,
+    status: 200,
+  },
+  {
     method: 'post',
     path: '/work-orders',
     pattern: 'createWorkOrder',
@@ -289,7 +304,15 @@ describe('HTTP rol izinleri — gerçek global guard ve controller akışı', ()
   beforeEach(() => {
     send.mockReset();
     send.mockImplementation((pattern: string) =>
-      of(pattern === 'ping' ? 'pong' : pattern === 'findAllShifts' ? [] : {}),
+      of(
+        pattern === 'ping'
+          ? 'pong'
+          : pattern === 'findAllShifts'
+            ? []
+            : pattern === 'findOneWorkOrder'
+              ? { id: 1, status: 'OPEN', teamId: null }
+              : {},
+      ),
     );
   });
   afterAll(async () => {
@@ -306,7 +329,9 @@ describe('HTTP rol izinleri — gerçek global guard ve controller akışı', ()
         .send('body' in route ? route.body : undefined);
       expect(result.status).toBe(allowed ? route.status : 403);
       if (allowed) {
-        expect(send).toHaveBeenCalledTimes(1);
+        expect(send).toHaveBeenCalledTimes(
+          route.pattern === 'changeWorkOrderStatus' ? 2 : 1,
+        );
         expect(send).toHaveBeenCalledWith(
           route.pattern,
           expect.objectContaining({
@@ -583,6 +608,62 @@ describe('HTTP rol izinleri — gerçek global guard ve controller akışı', ()
       .set('Authorization', `Bearer ${tokens.get(AccountRole.ADMIN)}`);
     expect(result.status).toBe(404);
     expect(send).not.toHaveBeenCalled();
+  });
+  it.each([
+    ['PLANNER', 403],
+    ['ADMIN', 200],
+  ] as const)('IN_PROGRESS iptalinde %s sonucu %s', async (role, status) => {
+    send.mockImplementation((pattern: string) =>
+      of(
+        pattern === 'findOneWorkOrder' ? { id: 1, status: 'IN_PROGRESS' } : {},
+      ),
+    );
+    const token = tokens.get(
+      role === 'ADMIN' ? AccountRole.ADMIN : AccountRole.PLANNER,
+    );
+    const result = await request(app.getHttpServer())
+      .patch('/api/work-orders/1/status')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: 'CANCELLED', reason: 'iptal' });
+    expect(result.status).toBe(status);
+    expect(send).toHaveBeenCalledTimes(status === 403 ? 1 : 2);
+    if (status === 200)
+      expect(send).toHaveBeenCalledWith(
+        'changeWorkOrderStatus',
+        expect.objectContaining({
+          data: {
+            id: 1,
+            status: 'CANCELLED',
+            reason: 'iptal',
+            expectedStatus: 'IN_PROGRESS',
+          },
+        }),
+      );
+  });
+  it('planner ASSIGNED iptalini yapabilir; sahte expectedStatus kullanılmaz', async () => {
+    send.mockImplementation((pattern: string) =>
+      of(pattern === 'findOneWorkOrder' ? { id: 1, status: 'ASSIGNED' } : {}),
+    );
+    const result = await request(app.getHttpServer())
+      .patch('/api/work-orders/1/status')
+      .set('Authorization', `Bearer ${tokens.get(AccountRole.PLANNER)}`)
+      .send({
+        status: 'CANCELLED',
+        reason: 'iptal',
+        expectedStatus: 'IN_PROGRESS',
+      });
+    expect(result.status).toBe(200);
+    expect(send).toHaveBeenCalledWith(
+      'changeWorkOrderStatus',
+      expect.objectContaining({
+        data: {
+          id: 1,
+          status: 'CANCELLED',
+          reason: 'iptal',
+          expectedStatus: 'ASSIGNED',
+        },
+      }),
+    );
   });
   it('Swagger mevcut tüm endpointler için rolleri ve public istisnaları açıklar', () => {
     for (const route of routes) {

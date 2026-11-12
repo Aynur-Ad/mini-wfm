@@ -1,3 +1,4 @@
+import { WorkOrderStatusHistory } from '../work-orders/entities/work-order-status-history.entity.js';
 import { WorkOrder } from '../work-orders/entities/work-order.entity.js';
 import { HttpStatus } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
@@ -54,7 +55,7 @@ describe('TeamsService', () => {
           getRepository: (entity: unknown) =>
             entity === WorkforceUser
               ? people
-              : entity === WorkOrder
+              : entity === WorkOrder || entity === WorkOrderStatusHistory
                 ? orders
                 : mockTeamRepository,
         }),
@@ -264,6 +265,21 @@ describe('TeamsService', () => {
   });
 
   describe('remove', () => {
+    it('ekip bağlantısı kaldırılmış olsa da geçmiş FK kaydını 409 ile korur', async () => {
+      mockTeamRepository.findOne.mockResolvedValue(mockTeam);
+      orders.existsBy
+        .mockResolvedValueOnce(false)
+        .mockResolvedValueOnce(false)
+        .mockResolvedValueOnce(true);
+      await expect(service.remove(1)).rejects.toMatchObject({
+        error: {
+          statusCode: 409,
+          message: 'İş emri durum geçmişi olan ekip silinemez',
+        },
+      });
+      expect(mockTeamRepository.remove).not.toHaveBeenCalled();
+    });
+
     it('üyesi olmayan ekipte de açık iş emri varsa 409 verir', async () => {
       mockTeamRepository.findOne.mockResolvedValue(mockTeam);
       orders.existsBy.mockResolvedValue(true);

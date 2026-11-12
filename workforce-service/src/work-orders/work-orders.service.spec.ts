@@ -1,3 +1,4 @@
+import { WorkOrderStatusHistory } from './entities/work-order-status-history.entity.js';
 import type { Repository } from 'typeorm';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { WorkOrdersService } from './work-orders.service.js';
@@ -21,6 +22,7 @@ describe('WorkOrdersService', () => {
     save: vi.fn(),
     manager: { transaction: vi.fn() },
   };
+  const history = { create: vi.fn(), save: vi.fn() };
   const query = vi.fn();
   const create = (data = dto) =>
     requestContext.run({ correlationId: 'work-order-test', actor }, () =>
@@ -44,8 +46,14 @@ describe('WorkOrdersService', () => {
     });
     repository.manager.transaction.mockImplementation(
       (work: (manager: unknown) => unknown) =>
-        work({ query, getRepository: () => repository }),
+        work({
+          query,
+          getRepository: (entity: unknown) =>
+            entity === WorkOrderStatusHistory ? history : repository,
+        }),
     );
+    history.create.mockImplementation((row: object) => row);
+    history.save.mockResolvedValue({});
     nextId = 1;
     insertError = undefined;
     query.mockImplementation((sql: string, params?: unknown[]) => {
@@ -237,6 +245,20 @@ describe('WorkOrdersService', () => {
   it('DB hatasını yutmaz; transaction hata ile biter', async () => {
     const error = new Error('write failed');
     insertError = error;
+    await expect(create()).rejects.toBe(error);
+  });
+  it('create ilk geçmiş satırını aynı transactionda yazar; hata varsa create başarısız olur', async () => {
+    await create();
+    expect(history.create).toHaveBeenCalledWith({
+      workOrderId: 1,
+      fromStatus: null,
+      toStatus: WorkOrderStatus.OPEN,
+      teamId: null,
+      reason: null,
+      changedById: 7,
+    });
+    const error = new Error('initial history failed');
+    history.save.mockRejectedValue(error);
     await expect(create()).rejects.toBe(error);
   });
 });

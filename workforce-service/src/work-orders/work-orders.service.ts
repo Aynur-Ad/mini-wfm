@@ -1,3 +1,11 @@
+import { WorkOrderStatusHistory } from './entities/work-order-status-history.entity.js';
+import {
+  STATUS_TRANSITIONS,
+  STATUS_LABELS,
+} from './rules/status-transitions.js';
+import type { ChangeWorkOrderStatusDto } from './dto/change-work-order-status.dto.js';
+import { Team } from '../teams/entities/team.entity.js';
+import { WorkforceUser } from '../workforce_users/entities/workforce_user.entity.js';
 import { Injectable } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -55,7 +63,19 @@ export class WorkOrdersService {
           actor.id,
         ],
       );
-      return repository.create(inserted[0]);
+      const order = repository.create(inserted[0]);
+      const history = manager.getRepository(WorkOrderStatusHistory);
+      await history.save(
+        history.create({
+          workOrderId: order.id,
+          fromStatus: null,
+          toStatus: WorkOrderStatus.OPEN,
+          teamId: null,
+          reason: null,
+          changedById: actor.id,
+        }),
+      );
+      return order;
     });
   }
 
@@ -89,6 +109,109 @@ export class WorkOrdersService {
       // status, teamId, code ve createdById bu uçtan değiştirilmez.
       return repository.save(order);
     });
+  }
+
+  async changeStatus(
+    id: number,
+    dto: ChangeWorkOrderStatusDto,
+  ): Promise<WorkOrder> {
+    const actor = requestContext.getStore()?.actor;
+    if (!actor) fail(401, 'İşlemi yapan kullanıcı bilgisi eksik');
+    return this.orders.manager.transaction(async (manager) => {
+      const repository = manager.getRepository(WorkOrder);
+      const order = await repository.findOne({
+        where: { id },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!order) fail(404, 'İş emri bulunamadı');
+      // API'deki dinamik rol kontrolü ile mutation arasındaki yarış kapatılır.
+      // Bu bir istemci version kontrolü değildir; o kural sonraki görevdedir.
+      if (order.status !== dto.expectedStatus)
+        fail(409, 'İş emrinin durumu değişti; tekrar deneyin');
+      const rule = STATUS_TRANSITIONS[order.status]?.[dto.status];
+      if (!rule)
+        fail(
+          409,
+          `İş emri ${STATUS_LABELS[order.status]} durumundan ${STATUS_LABELS[dto.status] ?? dto.status} durumuna alınamaz`,
+        );
+      const reason = dto.reason?.trim() || null;
+      if (rule.reasonRequired && !reason) fail(400, 'İptal nedeni zorunludur');
+      if (reason && Array.from(reason).length > 500)
+        fail(400, 'Neden en fazla 500 karakter olabilir');
+      let teamId = order.teamId;
+      if (rule.teamAction === 'assign') {
+        if (!Number.isInteger(dto.teamId) || !dto.teamId || dto.teamId < 1)
+          fail(400, 'Atamada geçerli ekip ID zorunludur');
+        const team = await manager.getRepository(Team).findOne({
+          where: { id: dto.teamId },
+          lock: { mode: 'pessimistic_write' },
+        });
+        if (!team) fail(404, 'Ekip bulunamadı');
+        if (!team.isActive) fail(409, 'Pasif ekibe iş emri atanamaz');
+        const active = await manager
+          .getRepository(WorkforceUser)
+          .createQueryBuilder('person')
+          .select(['person.id'])
+          .where('person.teamId = :teamId', { teamId: team.id })
+          .andWhere('person.isActive = :isActive', { isActive: true })
+          .orderBy('person.id', 'ASC')
+          .setLock('pessimistic_read')
+          .getMany();
+        if (active.length === 0) fail(409, 'Ekibin aktif üyesi bulunmuyor');
+        teamId = team.id;
+      } else if (rule.teamAction === 'clear') teamId = null;
+      const fromStatus = order.status;
+      order.status = dto.status;
+      order.teamId = teamId;
+      const saved = await repository.save(order);
+      const history = manager.getRepository(WorkOrderStatusHistory);
+      await history.save(
+        history.create({
+          workOrderId: id,
+          fromStatus,
+          toStatus: saved.status,
+          teamId: saved.teamId,
+          reason,
+          changedById: actor.id,
+        }),
+      );
+      return saved;
+    });
+  }
+
+  async findHistory(id: number) {
+    await this.findOne(id);
+    const rows = await this.orders.manager
+      .getRepository(WorkOrderStatusHistory)
+      .createQueryBuilder('history')
+      .innerJoinAndSelect('history.changedBy', 'account')
+      .select([
+        'history.id',
+        'history.workOrderId',
+        'history.fromStatus',
+        'history.toStatus',
+        'history.teamId',
+        'history.reason',
+        'history.changedById',
+        'history.changedAt',
+        'account.id',
+        'account.username',
+      ])
+      .where('history.workOrderId = :id', { id })
+      .orderBy('history.changedAt', 'ASC')
+      .addOrderBy('history.id', 'ASC')
+      .getMany();
+    return rows.map((row) => ({
+      id: row.id,
+      workOrderId: row.workOrderId,
+      fromStatus: row.fromStatus,
+      toStatus: row.toStatus,
+      teamId: row.teamId,
+      reason: row.reason,
+      changedById: row.changedById,
+      changedAt: row.changedAt,
+      changedBy: { id: row.changedBy.id, username: row.changedBy.username },
+    }));
   }
 
   private checkDueAt(dueAt: Date): void {

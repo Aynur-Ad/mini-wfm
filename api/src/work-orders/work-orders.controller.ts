@@ -1,3 +1,7 @@
+import { CurrentUser } from '../common/decorators/current-user.decorator.js';
+import type { AuthUser } from '../auth/auth-user.js';
+import { ChangeWorkOrderStatusDto } from './dto/change-work-order-status.dto.js';
+import { WorkOrderHistoryDto } from './dto/work-order-history.dto.js';
 import {
   Body,
   Controller,
@@ -71,5 +75,36 @@ export class WorkOrdersController {
     @Body() dto: UpdateWorkOrderDto,
   ) {
     return this.orders.update(id, dto);
+  }
+  @Patch(':id/status')
+  @Roles(AccountRole.ADMIN, AccountRole.PLANNER)
+  @ApiOperation({
+    summary: 'İş emrinin durumunu değiştirir',
+    description:
+      'İzin verilen roller: ADMIN, PLANNER. IN_PROGRESS → CANCELLED yalnızca ADMIN. ASSIGNED hedefi aktif ve aktif üyeli ekip ister. İptalde reason zorunlu. Geçiş ve geçmiş tek transaction içindedir.',
+  })
+  @ApiOkResponse({ type: WorkOrderResponseDto })
+  @ApiConflictResponse({
+    description:
+      'İzinsiz durum geçişi, eşzamanlı değişiklik veya atamaya uygun olmayan ekip',
+  })
+  changeStatus(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: ChangeWorkOrderStatusDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.orders.changeStatus(id, dto, user);
+  }
+
+  @Get(':id/history')
+  @Roles(AccountRole.ADMIN, AccountRole.PLANNER, AccountRole.VIEWER)
+  @ApiOperation({
+    summary: 'Durum geçmişini getirir',
+    description:
+      'İzin verilen roller: ADMIN, PLANNER, VIEWER. Eskiden yeniye, değiştiren hesabın kullanıcı adıyla döner.',
+  })
+  @ApiOkResponse({ type: WorkOrderHistoryDto, isArray: true })
+  findHistory(@Param('id', ParseIntPipe) id: number) {
+    return this.orders.findHistory(id);
   }
 }

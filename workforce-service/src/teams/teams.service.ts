@@ -1,3 +1,4 @@
+import { WorkOrderStatusHistory } from '../work-orders/entities/work-order-status-history.entity.js';
 import { WorkOrder } from '../work-orders/entities/work-order.entity.js';
 import { WorkOrderStatus } from '../work-orders/work-order.enums.js';
 import { HttpStatus, Injectable } from '@nestjs/common';
@@ -184,6 +185,16 @@ export class TeamsService {
         throw new RpcException({
           statusCode: 409,
           message: 'İş emri geçmişi olan ekip silinemez',
+        });
+      }
+      if (
+        await manager
+          .getRepository(WorkOrderStatusHistory)
+          .existsBy({ teamId: id })
+      ) {
+        throw new RpcException({
+          statusCode: 409,
+          message: 'İş emri durum geçmişi olan ekip silinemez',
         });
       }
       await teams.remove(team);
