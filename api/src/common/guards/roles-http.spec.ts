@@ -46,7 +46,7 @@ const routes = [
     pattern: 'changeWorkOrderStatus',
     roles: [AccountRole.ADMIN, AccountRole.PLANNER],
     status: 200,
-    body: { status: 'ASSIGNED', teamId: 1 },
+    body: { version: 1, status: 'ASSIGNED', teamId: 1 },
   },
   {
     method: 'get',
@@ -76,7 +76,7 @@ const routes = [
     pattern: 'updateWorkOrder',
     roles: [AccountRole.ADMIN, AccountRole.PLANNER],
     status: 200,
-    body: { title: 'Yeni' },
+    body: { version: 1, title: 'Yeni' },
   },
   {
     method: 'post',
@@ -657,7 +657,11 @@ describe('HTTP rol izinleri — gerçek global guard ve controller akışı', ()
         version: 99,
       });
     expect(result.status).toBe(200);
-    expect(send.mock.calls[0][1].data).toEqual({ id: 1, title: 'Yeni' });
+    expect(send.mock.calls[0][1].data).toEqual({
+      id: 1,
+      title: 'Yeni',
+      version: 99,
+    });
   });
   it('Swagger iş emrinde DELETE tanımlamaz', () => {
     expect(swagger.paths['/api/work-orders/{id}'].delete).toBeUndefined();
@@ -684,7 +688,7 @@ describe('HTTP rol izinleri — gerçek global guard ve controller akışı', ()
     const result = await request(app.getHttpServer())
       .patch('/api/work-orders/1/status')
       .set('Authorization', `Bearer ${token}`)
-      .send({ status: 'CANCELLED', reason: 'iptal' });
+      .send({ version: 1, status: 'CANCELLED', reason: 'iptal' });
     expect(result.status).toBe(status);
     expect(send).toHaveBeenCalledTimes(status === 403 ? 1 : 2);
     if (status === 200)
@@ -693,6 +697,7 @@ describe('HTTP rol izinleri — gerçek global guard ve controller akışı', ()
         expect.objectContaining({
           data: {
             id: 1,
+            version: 1,
             status: 'CANCELLED',
             reason: 'iptal',
             expectedStatus: 'IN_PROGRESS',
@@ -708,6 +713,7 @@ describe('HTTP rol izinleri — gerçek global guard ve controller akışı', ()
       .patch('/api/work-orders/1/status')
       .set('Authorization', `Bearer ${tokens.get(AccountRole.PLANNER)}`)
       .send({
+        version: 1,
         status: 'CANCELLED',
         reason: 'iptal',
         expectedStatus: 'IN_PROGRESS',
@@ -718,6 +724,7 @@ describe('HTTP rol izinleri — gerçek global guard ve controller akışı', ()
       expect.objectContaining({
         data: {
           id: 1,
+          version: 1,
           status: 'CANCELLED',
           reason: 'iptal',
           expectedStatus: 'ASSIGNED',
@@ -725,6 +732,38 @@ describe('HTTP rol izinleri — gerçek global guard ve controller akışı', ()
       }),
     );
   });
+  it.each([undefined, null, 0, -1, 1.5, '1', true])(
+    'iş emri PATCH version geçersizse 400, TCP çağrılmaz: %j',
+    async (version) => {
+      for (const suffix of ['', '/status']) {
+        const response = await request(app.getHttpServer())
+          .patch(`/api/work-orders/1${suffix}`)
+          .set('Authorization', `Bearer ${tokens.get(AccountRole.PLANNER)}`)
+          .send(
+            suffix
+              ? { version, status: 'CANCELLED', reason: 'İptal' }
+              : { version, title: 'Yeni' },
+          );
+        expect(response.status).toBe(400);
+        expect(send).not.toHaveBeenCalled();
+      }
+    },
+  );
+
+  it('worker sürüm çakışması HTTP 409 ve B21 mesajıyla korunur', async () => {
+    const error = {
+      statusCode: 409,
+      message: 'Kayıt siz düzenlerken değişti, sayfayı yenileyin',
+    };
+    send.mockReturnValue(throwError(() => error));
+    const response = await request(app.getHttpServer())
+      .patch('/api/work-orders/1')
+      .set('Authorization', `Bearer ${tokens.get(AccountRole.PLANNER)}`)
+      .send({ version: 1, title: 'Yeni' });
+    expect(response.status).toBe(409);
+    expect(response.body).toEqual(error);
+  });
+
   it('Swagger mevcut tüm endpointler için rolleri ve public istisnaları açıklar', () => {
     for (const route of routes) {
       const path = `/api${route.path.replace('/1', '/{id}').replace('/2', '/{workforceUserId}')}`;

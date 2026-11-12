@@ -80,10 +80,10 @@ export class WorkOrdersController {
   @ApiOperation({
     summary: 'İş emrini kısmi günceller',
     description:
-      'İzin verilen roller: ADMIN, PLANNER. Yalnız title/description/priority/dueAt değişir; status ve teamId yok sayılır. Kapanmış iş emri güncellenemez.',
+      'İzin verilen roller: ADMIN, PLANNER. version zorunludur. Yalnız title/description/priority/dueAt değişir; status ve teamId yok sayılır. Kapanmış iş emri güncellenemez.',
   })
   @ApiOkResponse({ type: WorkOrderResponseDto })
-  @ApiConflictResponse({ description: 'Kapanmış iş emri güncellenemez' })
+  @ApiConflictResponse({ description: 'Eski version veya kapanmış iş emri' })
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateWorkOrderDto,
@@ -95,12 +95,12 @@ export class WorkOrdersController {
   @ApiOperation({
     summary: 'İş emrinin durumunu değiştirir',
     description:
-      'İzin verilen roller: ADMIN, PLANNER. IN_PROGRESS → CANCELLED yalnızca ADMIN. ASSIGNED hedefi aktif ve aktif üyeli ekip ister. İptalde reason zorunlu. Geçiş ve geçmiş tek transaction içindedir.',
+      'İzin verilen roller: ADMIN, PLANNER. version zorunludur. IN_PROGRESS → CANCELLED yalnızca ADMIN. ASSIGNED hedefi aktif ve aktif üyeli ekip ister. İptalde reason zorunlu. Geçiş ve geçmiş tek transaction içindedir.',
   })
   @ApiOkResponse({ type: WorkOrderResponseDto })
   @ApiConflictResponse({
     description:
-      'İzinsiz durum geçişi, eşzamanlı değişiklik veya atamaya uygun olmayan ekip',
+      'Eski version, izinsiz durum geçişi veya atamaya uygun olmayan ekip',
   })
   changeStatus(
     @Param('id', ParseIntPipe) id: number,

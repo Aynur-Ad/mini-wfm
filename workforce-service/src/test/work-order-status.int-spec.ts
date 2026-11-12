@@ -45,16 +45,19 @@ describe('Durum ve geçmiş — gerçek PostgreSQL', () => {
         dueAt: new Date(Date.now() + 48 * 3_600_000).toISOString(),
       }),
     );
-  const change = (id: number, from: S, to: S) =>
-    run(() =>
+  const change = async (id: number, from: S, to: S, version?: number) => {
+    const requestedVersion = version ?? (await service.findOne(id)).version;
+    return run(() =>
       service.changeStatus(id, {
         id,
         status: to,
+        version: requestedVersion,
         expectedStatus: from,
         teamId: team.id,
         reason: 'Test nedeni',
       }),
     );
+  };
   beforeAll(async () => {
     database = await startPostgresTestDatabase();
     const runner = database.dataSource.createQueryRunner();
@@ -82,14 +85,12 @@ describe('Durum ve geçmiş — gerçek PostgreSQL', () => {
     team = await database!.dataSource
       .getRepository(Team)
       .save({ name: 'Durum Ekibi' });
-    person = await database!.dataSource
-      .getRepository(WorkforceUser)
-      .save({
-        firstName: 'Deniz',
-        lastName: 'Kaya',
-        registrationNumber: 'STATUS-1',
-        teamId: team.id,
-      });
+    person = await database!.dataSource.getRepository(WorkforceUser).save({
+      firstName: 'Deniz',
+      lastName: 'Kaya',
+      registrationNumber: 'STATUS-1',
+      teamId: team.id,
+    });
   });
   afterEach(async () => {
     await database?.clean();
@@ -101,12 +102,10 @@ describe('Durum ve geçmiş — gerçek PostgreSQL', () => {
   it.each(allowed)('%s → %s tek geçmiş satırı ekler', async (from, to) => {
     const order = await create();
     // Her izinli kenarı bağımsız sınamak için başlangıç fixture'ı hazırlanır.
-    await database!.dataSource
-      .getRepository(WorkOrder)
-      .update(order.id, {
-        status: from,
-        teamId: from === S.OPEN ? null : team.id,
-      });
+    await database!.dataSource.getRepository(WorkOrder).update(order.id, {
+      status: from,
+      teamId: from === S.OPEN ? null : team.id,
+    });
     const updated = await change(order.id, from, to);
     expect(updated.status).toBe(to);
     expect(updated.teamId).toBe(
@@ -224,9 +223,10 @@ describe('Durum ve geçmiş — gerçek PostgreSQL', () => {
   it('eşzamanlı değişiklikte yalnızca bir durum ve geçmiş satırı kaydolur', async () => {
     const order = await create();
     await change(order.id, S.OPEN, S.ASSIGNED);
+    const version = (await service.findOne(order.id)).version;
     const result = await Promise.allSettled([
-      change(order.id, S.ASSIGNED, S.IN_PROGRESS),
-      change(order.id, S.ASSIGNED, S.CANCELLED),
+      change(order.id, S.ASSIGNED, S.IN_PROGRESS, version),
+      change(order.id, S.ASSIGNED, S.CANCELLED, version),
     ]);
     expect(result.filter((row) => row.status === 'fulfilled')).toHaveLength(1);
     expect(result.find((row) => row.status === 'rejected')).toMatchObject({

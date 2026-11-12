@@ -11,6 +11,14 @@ import {
 } from 'class-validator';
 import { WorkOrderStatus } from '../work-order.enums.js';
 export class ChangeWorkOrderStatusDto {
+  @ApiProperty({
+    minimum: 1,
+    example: 1,
+    description: 'Son GET yanıtındaki version; her başarılı değişimde artar',
+  })
+  @IsInt()
+  @Min(1)
+  version: number;
   @ApiProperty({ enum: WorkOrderStatus })
   @IsEnum(WorkOrderStatus)
   status: WorkOrderStatus;

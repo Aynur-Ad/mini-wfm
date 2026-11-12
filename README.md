@@ -510,7 +510,7 @@ Başlık zorunludur, kırpılır ve en fazla 200 karakter olabilir. Açıklama o
 
 Kod `IE-2026-00001` biçimindedir. PostgreSQL'in `SERIAL` ID alanı için oluşturduğu sequence'ten `nextval` alınır ve aynı sayı ID ile kodda kullanılır. Paralel isteklerde `MAX(id)+1` hesabı yapılmaz. Sayı en az beş hanelidir; 99999 sonrasında kırpılmaz ve yıl değişiminde sıfırlanmaz. Kodun yıl bölümü sunucunun yerel ayarından bağımsız olarak UTC yılıdır. Sequence rollback ile geri alınmaz; hata sonrası numara boşlukları normaldir, aralıksız numaralandırma vaat edilmez.
 
-PATCH yalnızca `title`, `description`, `priority`, `dueAt` alanlarını kabul eder. Gönderilen `status`, `teamId`, `code`, `createdById` ve `version` alanları whitelist tarafından kaldırılır; servis de yalnız izinli alanları uygular. `COMPLETED` veya `CANCELLED` iş emri güncellenemez (`409`). Durum ve ekip ataması ayrı `/status` ucu üzerinden yapılır. `version` alanı 1'den başlar; kayıt güncellendiğinde artar, istemcinin sürümünü kontrol etme kuralı henüz uygulanmaz.
+PATCH yalnızca `title`, `description`, `priority`, `dueAt` alanlarını kabul eder. Gönderilen `status`, `teamId`, `code` ve `createdById` alanları whitelist tarafından kaldırılır; servis de yalnız izinli alanları uygular. `COMPLETED` veya `CANCELLED` iş emri güncellenemez (`409`). Durum ve ekip ataması ayrı `/status` ucu üzerinden yapılır. `version` alanı 1'den başlar; iki PATCH ucunda zorunludur ve son okunan değerle gönderilir. Her başarılı güncellemede sunucu tarafından tam bir artırılır; eski sürüm `409` döner.
 
 İş emri silme endpoint'i yoktur; geçmiş korunur. Açık iş emrine bağlı ekip üyesiz olsa da silinemez (`409`). B12 gereği kapanmış bağlı iş emri geçmişi de RESTRICT foreign key ile korunur; böyle bir ekipte de `409` döner.
 
@@ -542,9 +542,19 @@ Her listede `team: { id, name }` veya `null` ve SQL'de hesaplanan `isOverdue` al
 
 Örnek: `/api/work-orders?page=1&limit=10&status=OPEN&status=ASSIGNED&priority=HIGH&teamId=3&overdue=true&sortBy=priority&sortOrder=desc`.
 
+### Eşzamanlı güncelleme koruması
+
+`PATCH /api/work-orders/:id` ve `PATCH /api/work-orders/:id/status` gövdesinde son GET/liste yanıtından alınan pozitif tam sayı `version` zorunludur. Eksik, null, string veya geçersiz sayı `400` döner. Örneğin `{ "title": "Yeni başlık", "version": 1 }` ve `{ "status": "ASSIGNED", "teamId": 3, "version": 2 }`. Oluşturmada sürüm istemciden alınmaz; ilk sürüm 1'dir.
+
+Entity zaten `@VersionColumn` kullanır. Bunun tek başına eski istemci verisini reddedeceği varsayılmaz. Worker, izin verilen alanlarla bir UPDATE kurar ve `WHERE id = :id AND version = :version` koşulunu aynı sorguya ekler. Sürüm aynı SQL içinde `version + 1` yapılır. Güncel durum iş kuralları için önceden okunur; bu okuma sonrasında başka bir istek araya girerse korumayı SQL koşulu sağlar. Koşula uyan satır yoksa `409` ve **Kayıt siz düzenlerken değişti, sayfayı yenileyin** döner. Kayıt baştan yoksa `404` döner. ID ve sürüm SQL parametreleridir.
+
+Yanıtta yeni sürüm bulunur; bir sonraki istekte bu sürüm gönderilmelidir. İki istek aynı sürümle yarışırsa yalnız biri kazanır; PATCH ve durum değiştirme uçları da aynı sürümü paylaşır. Geçerli sürümle yalnız version gönderilen bir PATCH de başarılı güncelleme sayılır ve sürümü bir artırır. Durum geçişiyle geçmiş INSERT'i aynı transaction'dadır: geçmiş yazılamazsa yeni durum, ekip ve sürüm geri alınır; başarısız çakışma geçmiş eklemez.
+
+"Önce oku, sonra kontrol et, sonra yaz" tek başına yetmez: iki istek sürüm 1'i aynı anda okuyup kontrolü geçebilir. SQL'deki sürüm koşulu ilk yazımdan sonra ikinci isteğin sürüm 1'i değiştirmesini engeller. PostgreSQL UPDATE nedeniyle bekleyen isteğin koşulunu güncel satır üzerinde tekrar değerlendirir. Bu amaçla iş emrini önceden `FOR UPDATE` ile kilitlemek yerine koşullu güncelleme kullanılır; ekip/üye iş kuralları için gereken kilitler atamada korunur.
+
 ### Durum geçişleri ve geçmiş
 
-Durum değiştirme gövdesi `status`, opsiyonel `teamId` ve opsiyonel `reason` alır. İptalde neden zorunludur, kırpıldıktan sonra boş olamaz ve en fazla 500 karakterdir. Atamada ekip ID zorunludur; diğer hedeflere gönderilen ekip ID durumun kendi kuralını değiştirmez.
+Durum değiştirme gövdesi zorunlu `version`, `status`, opsiyonel `teamId` ve opsiyonel `reason` alır. İptalde neden zorunludur, kırpıldıktan sonra boş olamaz ve en fazla 500 karakterdir. Atamada ekip ID zorunludur; diğer hedeflere gönderilen ekip ID durumun kendi kuralını değiştirmez.
 
 | Mevcut durum | Hedef | Ek kural |
 | --- | --- | --- |
@@ -556,7 +566,7 @@ Durum değiştirme gövdesi `status`, opsiyonel `teamId` ve opsiyonel `reason` a
 | IN_PROGRESS | COMPLETED | Ekip korunur |
 | IN_PROGRESS | CANCELLED | reason zorunlu; yalnız ADMIN |
 
-Diğer tüm geçişler `409` ve Türkçe durum adlarıyla açıklama döndürür. Kurallar worker'da `work-orders/rules/status-transitions.ts` dosyasındadır. State'e bağlı rol kontrolü API'de yapılır. API'nin kontrol ettiği durum transaction içinde tekrar karşılaştırılır; arada durum değiştiyse işlem `409` ile durur. Bu dahili `expectedStatus` istemciden alınmaz; istemci version kontrolü ayrı bir geliştirme adımıdır.
+Diğer tüm geçişler `409` ve Türkçe durum adlarıyla açıklama döndürür. Kurallar worker'da `work-orders/rules/status-transitions.ts` dosyasındadır. State'e bağlı rol kontrolü API'de yapılır. API'nin kontrol ettiği durum transaction içinde tekrar karşılaştırılır; arada durum değiştiyse işlem `409` ile durur. Bu dahili `expectedStatus` istemciden alınmaz; durum değişikliğinde SQL koşuluna da eklenir. İstemcinin `version` değeri ayrıca iki güncelleme ucunda atomik olarak kontrol edilir.
 
 İş emrini oluşturma da ilk geçmiş satırını `fromStatus: null`, `toStatus: OPEN` olarak ekler. Sonraki değişiklikler `workforce.work_order_status_history` tablosuna önceki/yeni durum, işlem sonrası ekip, neden, değiştiren hesap ve zamanla yazılır. İş emri güncellemesi ve geçmiş ekleme tek transaction'dadır; geçmiş yazılamazsa durum/version/ekip de geri alınır. İlk geçmiş yazılamazsa iş emri oluşturma da geri alınır.
 

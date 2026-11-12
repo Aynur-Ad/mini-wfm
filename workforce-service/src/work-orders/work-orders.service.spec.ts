@@ -13,9 +13,19 @@ const dto = { title: 'Bakım', dueAt: '2099-01-02T10:00:00+03:00' };
 describe('WorkOrdersService', () => {
   let service: WorkOrdersService;
   let current: WorkOrder;
+  let changes: Record<string, unknown>;
+  const mutation = {
+    update: vi.fn(),
+    set: vi.fn(),
+    where: vi.fn(),
+    andWhere: vi.fn(),
+    execute: vi.fn(),
+  };
   let nextId: number;
   let insertError: Error | undefined;
   const repository = {
+    createQueryBuilder: vi.fn(),
+    findOneByOrFail: vi.fn(),
     findOneBy: vi.fn(),
     findOne: vi.fn(),
     create: vi.fn(),
@@ -86,6 +96,26 @@ describe('WorkOrdersService', () => {
     );
     repository.findOneBy.mockResolvedValue(current);
     repository.findOne.mockResolvedValue(current);
+    repository.findOneByOrFail.mockResolvedValue(current);
+    repository.createQueryBuilder.mockReturnValue(mutation);
+    for (const method of ['update', 'where', 'andWhere'] as const)
+      mutation[method].mockReturnValue(mutation);
+    mutation.set.mockImplementation((data: Record<string, unknown>) => {
+      changes = data;
+      return mutation;
+    });
+    mutation.execute.mockImplementation(() => {
+      Object.assign(
+        current,
+        Object.fromEntries(
+          Object.entries(changes).filter(
+            ([, value]) => typeof value !== 'function',
+          ),
+        ),
+      );
+      current.version += 1;
+      return Promise.resolve({ affected: 1 });
+    });
     service = new WorkOrdersService(
       repository as unknown as Repository<WorkOrder>,
     );
@@ -189,6 +219,7 @@ describe('WorkOrdersService', () => {
     const data = Object.assign(
       {
         id: 1,
+        version: 1,
         title: 'Yeni',
         description: null,
         priority: WorkOrderPriority.HIGH,
@@ -213,11 +244,14 @@ describe('WorkOrdersService', () => {
     });
     expect(repository.findOne).toHaveBeenCalledWith({
       where: { id: 1 },
-      lock: { mode: 'pessimistic_write' },
     });
   });
   it('gönderilmeyen alanları korur', async () => {
-    const result = await service.update(1, { id: 1, title: 'Yeni' });
+    const result = await service.update(1, {
+      id: 1,
+      version: 1,
+      title: 'Yeni',
+    });
     expect(result.dueAt).toEqual(new Date(dto.dueAt));
     expect(result.priority).toBe(WorkOrderPriority.MEDIUM);
   });
@@ -226,19 +260,21 @@ describe('WorkOrdersService', () => {
     async (status) => {
       current.status = status;
       await expect(
-        service.update(1, { id: 1, title: 'Yeni' }),
+        service.update(1, { id: 1, version: 1, title: 'Yeni' }),
       ).rejects.toMatchObject({ error: { statusCode: 409 } });
       expect(repository.save).not.toHaveBeenCalled();
     },
   );
   it('PATCH geçmiş dueAt için 400 verir', async () => {
     await expect(
-      service.update(1, { id: 1, dueAt: '2098-01-01T00:00:00Z' }),
+      service.update(1, { id: 1, version: 1, dueAt: '2098-01-01T00:00:00Z' }),
     ).rejects.toMatchObject({ error: { statusCode: 400 } });
   });
   it('PATCH bulunmayan kayıtta 404 verir', async () => {
     repository.findOne.mockResolvedValue(null);
-    await expect(service.update(99, { id: 99 })).rejects.toMatchObject({
+    await expect(
+      service.update(99, { id: 99, version: 1 }),
+    ).rejects.toMatchObject({
       error: { statusCode: 404 },
     });
   });
@@ -260,5 +296,35 @@ describe('WorkOrdersService', () => {
     const error = new Error('initial history failed');
     history.save.mockRejectedValue(error);
     await expect(create()).rejects.toBe(error);
+  });
+  it('UPDATE sırasında sürüm değişirse 409 verir; kontrol SQL koşulundadır', async () => {
+    mutation.execute.mockResolvedValue({ affected: 0 });
+    await expect(
+      service.update(1, { id: 1, version: 1, title: 'Yeni' }),
+    ).rejects.toMatchObject({
+      error: {
+        statusCode: 409,
+        message: 'Kayıt siz düzenlerken değişti, sayfayı yenileyin',
+      },
+    });
+    expect(mutation.andWhere).toHaveBeenCalledWith('"version" = :version', {
+      version: 1,
+    });
+    expect(repository.findOneByOrFail).not.toHaveBeenCalled();
+  });
+  it('başarılı PATCH versionı yalnız bir artırır; eski version yazma yapmaz', async () => {
+    expect(
+      (await service.update(1, { id: 1, version: 1, title: 'Yeni' })).version,
+    ).toBe(2);
+    mutation.execute.mockClear();
+    await expect(
+      service.update(1, { id: 1, version: 1, title: 'Eski' }),
+    ).rejects.toMatchObject({
+      error: {
+        statusCode: 409,
+        message: 'Kayıt siz düzenlerken değişti, sayfayı yenileyin',
+      },
+    });
+    expect(mutation.execute).not.toHaveBeenCalled();
   });
 });
