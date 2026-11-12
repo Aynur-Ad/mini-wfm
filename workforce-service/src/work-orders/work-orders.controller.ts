@@ -1,3 +1,4 @@
+import { QueryWorkOrdersDto } from './dto/query-work-orders.dto.js';
 import { ChangeWorkOrderStatusDto } from './dto/change-work-order-status.dto.js';
 import { Controller } from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
@@ -11,6 +12,11 @@ export class WorkOrdersController {
     @Payload() dto: CreateWorkOrderDto,
   ) {
     return this.orders.create(dto);
+  }
+  @MessagePattern('findAllWorkOrders') findAll(
+    @Payload() dto: QueryWorkOrdersDto,
+  ) {
+    return this.orders.findAll(dto);
   }
   @MessagePattern('findOneWorkOrder') findOne(@Payload() id: number) {
     return this.orders.findOne(id);

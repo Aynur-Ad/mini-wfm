@@ -1,3 +1,4 @@
+import type { QueryWorkOrdersDto } from './dto/query-work-orders.dto.js';
 import { WorkOrderStatusHistory } from './entities/work-order-status-history.entity.js';
 import {
   STATUS_TRANSITIONS,
@@ -77,6 +78,108 @@ export class WorkOrdersService {
       );
       return order;
     });
+  }
+
+  async findAll(dto: QueryWorkOrdersDto = {}) {
+    const page = dto.page ?? 1;
+    const limit = dto.limit ?? 10;
+    const sortBy = dto.sortBy ?? 'createdAt';
+    const sortOrder = dto.sortOrder ?? 'desc';
+    // Alan ve yön yalnız sabit beyaz listeden seçilir; istemci SQL üretemez.
+    const sortColumns = {
+      createdAt: 'wo.createdAt',
+      dueAt: 'wo.dueAt',
+      priority: 'priority_rank',
+    };
+    if (
+      !Object.hasOwn(sortColumns, sortBy) ||
+      !['asc', 'desc'].includes(sortOrder)
+    )
+      fail(400, 'Geçersiz sıralama alanı veya yönü');
+    const now = new Date();
+    const closed = [WorkOrderStatus.COMPLETED, WorkOrderStatus.CANCELLED];
+    // Aynı referans anı hem filtrede hem hesaplanan alanda kullanılır.
+    const overdueSql = '(wo.dueAt < :now AND wo.status NOT IN (:...closed))';
+    const query = this.orders
+      .createQueryBuilder('wo')
+      .leftJoin('wo.team', 'team')
+      .select('wo.id', 'id')
+      .addSelect('wo.code', 'code')
+      .addSelect('wo.title', 'title')
+      .addSelect('wo.description', 'description')
+      .addSelect('wo.priority', 'priority')
+      .addSelect('wo.status', 'status')
+      .addSelect('wo.teamId', 'teamId')
+      .addSelect('wo.dueAt', 'dueAt')
+      .addSelect('wo.version', 'version')
+      .addSelect('wo.createdById', 'createdById')
+      .addSelect('wo.createdAt', 'createdAt')
+      .addSelect('wo.updatedAt', 'updatedAt')
+      .addSelect('team.id', 'joinedTeamId')
+      .addSelect('team.name', 'teamName')
+      .addSelect(overdueSql, 'isOverdue')
+      .addSelect(
+        "CASE wo.priority WHEN 'LOW' THEN 1 WHEN 'MEDIUM' THEN 2 WHEN 'HIGH' THEN 3 WHEN 'URGENT' THEN 4 END",
+        'priority_rank',
+      )
+      .setParameters({ now, closed });
+    const search = dto.search?.trim();
+    if (search) {
+      // LIKE jokerleri arama metninde gerçek karakter olarak ele alınır.
+      const escaped = search.replace(
+        /[\\%_]/g,
+        (character) => `\\${character}`,
+      );
+      query.andWhere('(wo.code ILIKE :search OR wo.title ILIKE :search)', {
+        search: `%${escaped}%`,
+      });
+    }
+    if (dto.status?.length)
+      query.andWhere('wo.status IN (:...statuses)', { statuses: dto.status });
+    if (dto.priority !== undefined)
+      query.andWhere('wo.priority = :priority', { priority: dto.priority });
+    if (dto.teamId !== undefined)
+      query.andWhere('wo.teamId = :teamId', { teamId: dto.teamId });
+    if (dto.overdue === true) query.andWhere(overdueSql);
+    // total, sayfa sınırından önceki filtrelenmiş kayıt sayısıdır.
+    const total = await query.clone().getCount();
+    const rows = await query
+      .orderBy(sortColumns[sortBy], sortOrder === 'asc' ? 'ASC' : 'DESC')
+      .addOrderBy('wo.id', sortOrder === 'asc' ? 'ASC' : 'DESC')
+      .offset((page - 1) * limit)
+      .limit(limit)
+      .getRawMany<{
+        id: number;
+        code: string;
+        title: string;
+        description: string | null;
+        priority: WorkOrderPriority;
+        status: WorkOrderStatus;
+        teamId: number | null;
+        dueAt: Date;
+        version: number;
+        createdById: number;
+        createdAt: Date;
+        updatedAt: Date;
+        joinedTeamId: number | null;
+        teamName: string | null;
+        isOverdue: boolean;
+        priority_rank: number;
+      }>();
+    return {
+      data: rows.map(
+        ({ joinedTeamId, teamName, priority_rank: _rank, ...order }) => ({
+          ...order,
+          team:
+            joinedTeamId === null
+              ? null
+              : { id: joinedTeamId, name: teamName! },
+        }),
+      ),
+      total,
+      page,
+      limit,
+    };
   }
 
   async findOne(id: number): Promise<WorkOrder> {
