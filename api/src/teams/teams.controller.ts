@@ -139,7 +139,9 @@ export class TeamsController {
     example: 1,
   })
   @ApiNoContentResponse({ description: 'Ekip başarıyla silindi' })
-  @ApiConflictResponse({ description: 'Üyesi olan ekip silinemez' })
+  @ApiConflictResponse({
+    description: 'Üyesi veya bağlı iş emri olan ekip silinemez',
+  })
   @ApiBadRequestResponse({ description: 'Geçersiz ID formatı (sayı değil)' })
   @ApiNotFoundResponse({ description: 'Ekip bulunamadı' })
   remove(@Param('id', ParseIntPipe) id: number): Observable<void> {

@@ -1,3 +1,5 @@
+import { WorkOrdersController } from './work-orders/work-orders.controller.js';
+import { WorkOrdersService } from './work-orders/work-orders.service.js';
 import { ShiftsController } from './shifts/shifts.controller.js';
 import { ShiftsService } from './shifts/shifts.service.js';
 import { APP_GUARD } from '@nestjs/core';
@@ -61,6 +63,7 @@ import { WorkforceUsersController } from './workforce_users/workforce_users.cont
     ]),
   ],
   controllers: [
+    WorkOrdersController,
     ShiftsController,
     AuthController,
     AppController,
@@ -69,6 +72,7 @@ import { WorkforceUsersController } from './workforce_users/workforce_users.cont
     AccountsController,
   ], // gelen http isteklerini karşılayıp yanıt dönecek denetleyicileri kaydeder.
   providers: [
+    WorkOrdersService,
     ShiftsService,
     AuthService,
     { provide: APP_GUARD, useClass: JwtGuard },

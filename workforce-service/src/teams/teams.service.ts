@@ -1,7 +1,9 @@
+import { WorkOrder } from '../work-orders/entities/work-order.entity.js';
+import { WorkOrderStatus } from '../work-orders/work-order.enums.js';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
 import { InjectRepository } from '@nestjs/typeorm';
-import { FindOptionsWhere, ILike, Repository } from 'typeorm';
+import { FindOptionsWhere, ILike, In, Not, Repository } from 'typeorm';
 import { CreateTeamDto } from './dto/create-team.dto.js';
 import { QueryTeamsDto } from './dto/query-teams.dto.js';
 import { UpdateTeamDto } from './dto/update-team.dto.js';
@@ -161,6 +163,27 @@ export class TeamsService {
           statusCode: HttpStatus.CONFLICT,
           message:
             'Üyesi olan ekip silinemez. Önce personelleri ekipten çıkarın.',
+        });
+      }
+      const orders = manager.getRepository(WorkOrder);
+      if (
+        await orders.existsBy({
+          teamId: id,
+          status: Not(
+            In([WorkOrderStatus.COMPLETED, WorkOrderStatus.CANCELLED]),
+          ),
+        })
+      ) {
+        throw new RpcException({
+          statusCode: 409,
+          message: 'Açık iş emri olan ekip silinemez',
+        });
+      }
+      // B12: kapanmış iş emri de ekibe bağlı bir geçmiş kaydıdır; RESTRICT korunur.
+      if (await orders.existsBy({ teamId: id })) {
+        throw new RpcException({
+          statusCode: 409,
+          message: 'İş emri geçmişi olan ekip silinemez',
         });
       }
       await teams.remove(team);

@@ -35,6 +35,29 @@ const adminOnly = [AccountRole.ADMIN];
 const routes = [
   {
     method: 'post',
+    path: '/work-orders',
+    pattern: 'createWorkOrder',
+    roles: [AccountRole.ADMIN, AccountRole.PLANNER],
+    status: 201,
+    body: { title: 'Bakım', dueAt: '2099-01-02T10:00:00Z' },
+  },
+  {
+    method: 'get',
+    path: '/work-orders/1',
+    pattern: 'findOneWorkOrder',
+    roles: allRoles,
+    status: 200,
+  },
+  {
+    method: 'patch',
+    path: '/work-orders/1',
+    pattern: 'updateWorkOrder',
+    roles: [AccountRole.ADMIN, AccountRole.PLANNER],
+    status: 200,
+    body: { title: 'Yeni' },
+  },
+  {
+    method: 'post',
     path: '/teams/1/shifts',
     pattern: 'createTeamShifts',
     roles: [AccountRole.ADMIN, AccountRole.PLANNER],
@@ -535,6 +558,32 @@ describe('HTTP rol izinleri — gerçek global guard ve controller akışı', ()
     expect(send).not.toHaveBeenCalled();
   });
 
+  it('PATCH status/teamId/code/actor alanlarını TCP verisine taşımaz', async () => {
+    const result = await request(app.getHttpServer())
+      .patch('/api/work-orders/1')
+      .set('Authorization', `Bearer ${tokens.get(AccountRole.PLANNER)}`)
+      .send({
+        title: 'Yeni',
+        status: 'COMPLETED',
+        teamId: 9,
+        code: 'forged',
+        createdById: 99,
+        actor: { id: 99 },
+        version: 99,
+      });
+    expect(result.status).toBe(200);
+    expect(send.mock.calls[0][1].data).toEqual({ id: 1, title: 'Yeni' });
+  });
+  it('Swagger iş emrinde DELETE tanımlamaz', () => {
+    expect(swagger.paths['/api/work-orders/{id}'].delete).toBeUndefined();
+  });
+  it('DELETE isteğinde handler yoktur ve TCP gönderilmez', async () => {
+    const result = await request(app.getHttpServer())
+      .delete('/api/work-orders/1')
+      .set('Authorization', `Bearer ${tokens.get(AccountRole.ADMIN)}`);
+    expect(result.status).toBe(404);
+    expect(send).not.toHaveBeenCalled();
+  });
   it('Swagger mevcut tüm endpointler için rolleri ve public istisnaları açıklar', () => {
     for (const route of routes) {
       const path = `/api${route.path.replace('/1', '/{id}').replace('/2', '/{workforceUserId}')}`;

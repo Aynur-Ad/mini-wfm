@@ -56,6 +56,29 @@ describe('Migration yaşam döngüsü — gerçek PostgreSQL', () => {
       const teamTable = await runner.getTable('workforce.team');
       const peopleTable = await runner.getTable('workforce.workforce_user');
       const shiftTable = await runner.getTable('workforce.shift');
+      const orderTable = await runner.getTable('workforce.work_order');
+      expect(
+        orderTable?.uniques.some((key) => key.name === 'UQ_work_order_code'),
+      ).toBe(true);
+      expect(
+        orderTable?.foreignKeys.some(
+          (key) =>
+            key.name === 'FK_work_order_team' && key.onDelete === 'RESTRICT',
+        ),
+      ).toBe(true);
+      expect(
+        orderTable?.foreignKeys.some(
+          (key) => key.name === 'FK_work_order_created_by',
+        ),
+      ).toBe(true);
+      expect(
+        orderTable?.columns.find((column) => column.name === 'id')?.isGenerated,
+      ).toBe(true);
+      const sequences = await dataSource.query<{ name: string | null }[]>(
+        "SELECT pg_get_serial_sequence('workforce.work_order', 'id') AS name",
+      );
+      expect(sequences[0].name).not.toBeNull();
+
       expect(
         shiftTable?.indices.some(
           (index) => index.name === 'IDX_shift_start_at',
