@@ -1,3 +1,4 @@
+import { ChangeWorkOrderStatusDto } from './dto/change-work-order-status.dto.js';
 import { Controller } from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 import { WorkOrdersService } from './work-orders.service.js';
@@ -18,5 +19,13 @@ export class WorkOrdersController {
     @Payload() dto: UpdateWorkOrderDto,
   ) {
     return this.orders.update(dto.id, dto);
+  }
+  @MessagePattern('changeWorkOrderStatus') changeStatus(
+    @Payload() dto: ChangeWorkOrderStatusDto,
+  ) {
+    return this.orders.changeStatus(dto.id, dto);
+  }
+  @MessagePattern('findWorkOrderHistory') findHistory(@Payload() id: number) {
+    return this.orders.findHistory(id);
   }
 }

@@ -1,4 +1,5 @@
 /// <reference types="vite/client" />
+import { WorkOrderStatusHistory } from '../work-orders/entities/work-order-status-history.entity.js';
 import { WorkOrder } from '../work-orders/entities/work-order.entity.js';
 import { Shift } from '../shifts/entities/shift.entity.js';
 import 'reflect-metadata';
@@ -50,7 +51,14 @@ export async function startPostgresTestDatabase(): Promise<PostgresTestDatabase>
     password: container.getPassword(),
     database: container.getDatabase(),
     namingStrategy: new SnakeNamingStrategy(),
-    entities: [Team, WorkforceUser, Account, Shift, WorkOrder],
+    entities: [
+      Team,
+      WorkforceUser,
+      Account,
+      Shift,
+      WorkOrder,
+      WorkOrderStatusHistory,
+    ],
     migrations: Object.values(migrationModules).flatMap(Object.values),
     migrationsRun: false,
     synchronize: false,

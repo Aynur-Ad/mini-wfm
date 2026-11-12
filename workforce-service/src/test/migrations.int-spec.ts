@@ -57,6 +57,22 @@ describe('Migration yaşam döngüsü — gerçek PostgreSQL', () => {
       const peopleTable = await runner.getTable('workforce.workforce_user');
       const shiftTable = await runner.getTable('workforce.shift');
       const orderTable = await runner.getTable('workforce.work_order');
+      const historyTable = await runner.getTable(
+        'workforce.work_order_status_history',
+      );
+      expect(historyTable?.foreignKeys.map((key) => key.name).sort()).toEqual(
+        [
+          'FK_work_order_history_account',
+          'FK_work_order_history_order',
+          'FK_work_order_history_team',
+        ].sort(),
+      );
+      expect(
+        historyTable?.indices.some(
+          (index) => index.name === 'IDX_work_order_status_history_order_time',
+        ),
+      ).toBe(true);
+
       expect(
         orderTable?.uniques.some((key) => key.name === 'UQ_work_order_code'),
       ).toBe(true);
