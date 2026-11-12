@@ -7,7 +7,9 @@ import { WorkOrderPriority } from '../work-order.enums.js';
 const valid = { title: 'Bakım', dueAt: '2099-01-02T08:00:00+03:00' };
 const errors = (body: object, patch = false) =>
   validate(
-    plainToInstance(patch ? UpdateWorkOrderDto : CreateWorkOrderDto, body),
+    patch
+      ? plainToInstance(UpdateWorkOrderDto, { version: 1, ...body })
+      : plainToInstance(CreateWorkOrderDto, body),
   );
 describe('İş emri DTO', () => {
   it('başlığı trim eder', async () => {
@@ -58,20 +60,22 @@ describe('İş emri DTO', () => {
   it.each([false, true])(
     'status/teamId/code/actor gibi alanlar whitelist ile silinir; patch=%s',
     async (patch) => {
-      const dto = plainToInstance(
-        patch ? UpdateWorkOrderDto : CreateWorkOrderDto,
-        {
-          ...valid,
-          status: 'COMPLETED',
-          teamId: 9,
-          code: 'forged',
-          createdById: 99,
-          actor: { id: 99 },
-          version: 99,
-        },
-      );
+      const body = {
+        ...valid,
+        status: 'COMPLETED',
+        teamId: 9,
+        code: 'forged',
+        createdById: 99,
+        actor: { id: 99 },
+        version: 99,
+      };
+      const dto = patch
+        ? plainToInstance(UpdateWorkOrderDto, body)
+        : plainToInstance(CreateWorkOrderDto, body);
       expect(await validate(dto, { whitelist: true })).toEqual([]);
-      expect(JSON.parse(JSON.stringify(dto))).toEqual(valid);
+      expect(JSON.parse(JSON.stringify(dto))).toEqual(
+        patch ? { ...valid, version: 99 } : valid,
+      );
     },
   );
 });

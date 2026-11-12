@@ -117,6 +117,7 @@ describe('WorkOrdersService — gerçek PostgreSQL', () => {
     const data = Object.assign(
       {
         id: a.id,
+        version: a.version,
         title: 'Yeni',
         description: null,
         priority: WorkOrderPriority.HIGH,
@@ -147,7 +148,11 @@ describe('WorkOrdersService — gerçek PostgreSQL', () => {
         .getRepository(WorkOrder)
         .update(a.id, { status });
       await expect(
-        service.update(a.id, { id: a.id, title: 'Yasak' }),
+        service.update(a.id, {
+          id: a.id,
+          version: (await service.findOne(a.id)).version,
+          title: 'Yasak',
+        }),
       ).rejects.toMatchObject({ error: { statusCode: 409 } });
       expect((await service.findOne(a.id)).title).toBe('Bakım');
     },
@@ -156,7 +161,7 @@ describe('WorkOrdersService — gerçek PostgreSQL', () => {
     const a = await create();
     const past = new Date(Date.now() - 60_000).toISOString();
     await expect(
-      service.update(a.id, { id: a.id, dueAt: past }),
+      service.update(a.id, { id: a.id, version: a.version, dueAt: past }),
     ).rejects.toMatchObject({ error: { statusCode: 400 } });
     await expect(
       requestContext.run(

@@ -3,7 +3,7 @@ import { validate } from 'class-validator';
 import { describe, expect, it } from 'vitest';
 import { ChangeWorkOrderStatusDto } from './change-work-order-status.dto.js';
 const errors = (body: object) =>
-  validate(plainToInstance(ChangeWorkOrderStatusDto, body));
+  validate(plainToInstance(ChangeWorkOrderStatusDto, { version: 1, ...body }));
 describe('Durum DTO', () => {
   it.each([
     { status: 'ASSIGNED', teamId: 1 },
@@ -30,6 +30,7 @@ describe('Durum DTO', () => {
   });
   it('neden kırpılır; beklenen durum ve actor istemciden alınmaz', async () => {
     const dto = plainToInstance(ChangeWorkOrderStatusDto, {
+      version: 1,
       status: 'CANCELLED',
       reason: ' neden ',
       expectedStatus: 'OPEN',
@@ -38,6 +39,7 @@ describe('Durum DTO', () => {
     });
     expect(await validate(dto, { whitelist: true })).toEqual([]);
     expect(JSON.parse(JSON.stringify(dto))).toEqual({
+      version: 1,
       status: 'CANCELLED',
       reason: 'neden',
     });

@@ -28,6 +28,14 @@ const actor = { id: 7, username: 'admin', role: AccountRole.ADMIN };
 describe('İş emri durum/geçmiş service', () => {
   let service: WorkOrdersService;
   let current: WorkOrder;
+  let changes: Record<string, unknown>;
+  const mutation = {
+    update: vi.fn(),
+    set: vi.fn(),
+    where: vi.fn(),
+    andWhere: vi.fn(),
+    execute: vi.fn(),
+  };
   const history = { create: vi.fn(), save: vi.fn() };
   const team = { findOne: vi.fn() };
   const members = {
@@ -40,6 +48,8 @@ describe('İş emri durum/geçmiş service', () => {
   };
   const people = { createQueryBuilder: vi.fn() };
   const orders = {
+    createQueryBuilder: vi.fn(),
+    findOneByOrFail: vi.fn(),
     findOne: vi.fn(),
     save: vi.fn(),
     manager: { transaction: vi.fn() },
@@ -51,6 +61,7 @@ describe('İş emri durum/geçmiş service', () => {
         Object.assign(
           {
             id: 1,
+            version: current.version,
             status,
             expectedStatus: current.status,
             teamId: 2,
@@ -69,6 +80,26 @@ describe('İş emri durum/geçmiş service', () => {
       version: 1,
     });
     orders.findOne.mockResolvedValue(current);
+    orders.findOneByOrFail.mockResolvedValue(current);
+    orders.createQueryBuilder.mockReturnValue(mutation);
+    for (const method of ['update', 'where', 'andWhere'] as const)
+      mutation[method].mockReturnValue(mutation);
+    mutation.set.mockImplementation((data: Record<string, unknown>) => {
+      changes = data;
+      return mutation;
+    });
+    mutation.execute.mockImplementation(() => {
+      Object.assign(
+        current,
+        Object.fromEntries(
+          Object.entries(changes).filter(
+            ([, value]) => typeof value !== 'function',
+          ),
+        ),
+      );
+      current.version += 1;
+      return Promise.resolve({ affected: 1 });
+    });
     orders.save.mockImplementation((row: WorkOrder) => Promise.resolve(row));
     orders.manager.transaction.mockImplementation(
       (work: (m: unknown) => unknown) =>
@@ -105,6 +136,7 @@ describe('İş emri durum/geçmiş service', () => {
       current.teamId = from === S.OPEN ? null : 2;
       const result = await change(to);
       expect(result.status).toBe(to);
+      expect(result.version).toBe(2);
       expect(result.teamId).toBe(
         to === S.OPEN
           ? null
@@ -146,7 +178,7 @@ describe('İş emri durum/geçmiş service', () => {
     ).rejects.toMatchObject({
       error: {
         statusCode: 409,
-        message: 'İş emrinin durumu değişti; tekrar deneyin',
+        message: 'Kayıt siz düzenlerken değişti, sayfayı yenileyin',
       },
     });
     expect(orders.save).not.toHaveBeenCalled();
@@ -207,10 +239,38 @@ describe('İş emri durum/geçmiş service', () => {
     await expect(
       service.changeStatus(1, {
         id: 1,
+        version: 1,
         status: S.CANCELLED,
         expectedStatus: S.OPEN,
         reason: 'neden',
       }),
     ).rejects.toMatchObject({ error: { statusCode: 401 } });
+  });
+  it('koşullu durum UPDATEi sıfır satır etkilerse geçmiş yazılmaz', async () => {
+    mutation.execute.mockResolvedValue({ affected: 0 });
+    await expect(change(S.ASSIGNED)).rejects.toMatchObject({
+      error: {
+        statusCode: 409,
+        message: 'Kayıt siz düzenlerken değişti, sayfayı yenileyin',
+      },
+    });
+    expect(history.save).not.toHaveBeenCalled();
+    expect(mutation.andWhere).toHaveBeenCalledWith('"version" = :version', {
+      version: 1,
+    });
+    expect(mutation.andWhere).toHaveBeenCalledWith(
+      '"status" = :expectedStatus',
+      { expectedStatus: S.OPEN },
+    );
+  });
+  it('eski sürümde durum ve geçmiş değişmez', async () => {
+    await expect(change(S.ASSIGNED, { version: 99 })).rejects.toMatchObject({
+      error: {
+        statusCode: 409,
+        message: 'Kayıt siz düzenlerken değişti, sayfayı yenileyin',
+      },
+    });
+    expect(mutation.execute).not.toHaveBeenCalled();
+    expect(history.save).not.toHaveBeenCalled();
   });
 });

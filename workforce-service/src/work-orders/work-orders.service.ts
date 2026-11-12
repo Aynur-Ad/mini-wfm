@@ -191,26 +191,27 @@ export class WorkOrdersService {
   async update(id: number, dto: UpdateWorkOrderDto): Promise<WorkOrder> {
     return this.orders.manager.transaction(async (manager) => {
       const repository = manager.getRepository(WorkOrder);
-      const order = await repository.findOne({
-        where: { id },
-        lock: { mode: 'pessimistic_write' },
-      });
+      const order = await repository.findOne({ where: { id } });
       if (!order) fail(404, 'İş emri bulunamadı');
+      this.checkVersion(order.version, dto.version);
       if (
         order.status === WorkOrderStatus.COMPLETED ||
         order.status === WorkOrderStatus.CANCELLED
       )
         fail(409, 'Kapanmış iş emri güncellenemez');
+      const changes: Partial<
+        Pick<WorkOrder, 'title' | 'description' | 'priority' | 'dueAt'>
+      > = {};
       if (dto.dueAt !== undefined) {
         const dueAt = new Date(dto.dueAt);
         this.checkDueAt(dueAt);
-        order.dueAt = dueAt;
+        changes.dueAt = dueAt;
       }
-      if (dto.title !== undefined) order.title = dto.title;
-      if (dto.description !== undefined) order.description = dto.description;
-      if (dto.priority !== undefined) order.priority = dto.priority;
-      // status, teamId, code ve createdById bu uçtan değiştirilmez.
-      return repository.save(order);
+      if (dto.title !== undefined) changes.title = dto.title;
+      if (dto.description !== undefined) changes.description = dto.description;
+      if (dto.priority !== undefined) changes.priority = dto.priority;
+      // Durum/ekip/kod/oluşturan alanları buradan değişmez. version yalnız koşuldur.
+      return this.updateIfVersionMatches(repository, id, dto.version, changes);
     });
   }
 
@@ -222,15 +223,11 @@ export class WorkOrdersService {
     if (!actor) fail(401, 'İşlemi yapan kullanıcı bilgisi eksik');
     return this.orders.manager.transaction(async (manager) => {
       const repository = manager.getRepository(WorkOrder);
-      const order = await repository.findOne({
-        where: { id },
-        lock: { mode: 'pessimistic_write' },
-      });
+      const order = await repository.findOne({ where: { id } });
       if (!order) fail(404, 'İş emri bulunamadı');
+      this.checkVersion(order.version, dto.version);
       // API'deki dinamik rol kontrolü ile mutation arasındaki yarış kapatılır.
-      // Bu bir istemci version kontrolü değildir; o kural sonraki görevdedir.
-      if (order.status !== dto.expectedStatus)
-        fail(409, 'İş emrinin durumu değişti; tekrar deneyin');
+      if (order.status !== dto.expectedStatus) this.versionConflict();
       const rule = STATUS_TRANSITIONS[order.status]?.[dto.status];
       if (!rule)
         fail(
@@ -264,9 +261,13 @@ export class WorkOrdersService {
         teamId = team.id;
       } else if (rule.teamAction === 'clear') teamId = null;
       const fromStatus = order.status;
-      order.status = dto.status;
-      order.teamId = teamId;
-      const saved = await repository.save(order);
+      const saved = await this.updateIfVersionMatches(
+        repository,
+        id,
+        dto.version,
+        { status: dto.status, teamId },
+        dto.expectedStatus,
+      );
       const history = manager.getRepository(WorkOrderStatusHistory);
       await history.save(
         history.create({
@@ -315,6 +316,47 @@ export class WorkOrdersService {
       changedAt: row.changedAt,
       changedBy: { id: row.changedBy.id, username: row.changedBy.username },
     }));
+  }
+
+  private versionConflict(): never {
+    fail(409, 'Kayıt siz düzenlerken değişti, sayfayı yenileyin');
+  }
+
+  private checkVersion(current: number, requested: number): void {
+    if (current !== requested) this.versionConflict();
+  }
+
+  private async updateIfVersionMatches(
+    repository: Repository<WorkOrder>,
+    id: number,
+    version: number,
+    changes: Partial<
+      Pick<
+        WorkOrder,
+        'title' | 'description' | 'priority' | 'dueAt' | 'status' | 'teamId'
+      >
+    >,
+    expectedStatus?: WorkOrderStatus,
+  ): Promise<WorkOrder> {
+    // Okuma anındaki kontrol tek başına yeterli değildir. PostgreSQL, bekleyen
+    // UPDATE'in WHERE koşulunu satırın güncel sürümü üzerinde tekrar değerlendirir.
+    // Sürümü aynı SQL'de bir artırırız; save() ile ikinci güncelleme yapılmaz.
+    const query = repository
+      .createQueryBuilder()
+      .update(WorkOrder)
+      .set({
+        ...changes,
+        version: () => '"version" + 1',
+        updatedAt: () => 'CURRENT_TIMESTAMP',
+      })
+      .where('"id" = :id', { id })
+      .andWhere('"version" = :version', { version });
+    if (expectedStatus !== undefined)
+      query.andWhere('"status" = :expectedStatus', { expectedStatus });
+    const result = await query.execute();
+    if (result.affected !== 1) this.versionConflict();
+    // Transaction bitene kadar UPDATE satır kilidini tutar; kendi yeni sürümümüz okunur.
+    return repository.findOneByOrFail({ id });
   }
 
   private checkDueAt(dueAt: Date): void {
