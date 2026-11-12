@@ -289,6 +289,7 @@ Kimlik doğrulamadan sonra rol kontrolü yapılır. Token geçerli olduğu halde
 | Vardiya listesi ve detayı | Evet | Evet | Evet |
 | Vardiya oluşturma, güncelleme ve silme | Hayır | Evet | Evet |
 | Ekibe toplu vardiya atama | Hayır | Evet | Evet |
+| İş emri listesi | Evet | Evet | Evet |
 | İş emri detayı | Evet | Evet | Evet |
 | İş emri oluşturma ve güncelleme | Hayır | Evet | Evet |
 | İş emri durum değiştirme | Hayır | Evet | Evet |
@@ -498,6 +499,7 @@ Bu üretim komutu ilgili migration henüz yokken geliştirme sırasında bir kez
 
 | İşlem | Endpoint | Roller | Başarı |
 | --- | --- | --- | --- |
+| Liste | GET `/api/work-orders` | ADMIN, PLANNER, VIEWER | 200; `{ data, total, page, limit }` |
 | Oluşturma | POST `/api/work-orders` | ADMIN, PLANNER | 201 |
 | Detay | GET `/api/work-orders/:id` | ADMIN, PLANNER, VIEWER | 200 |
 | Kısmi güncelleme | PATCH `/api/work-orders/:id` | ADMIN, PLANNER | 200 |
@@ -520,6 +522,25 @@ pnpm --dir workforce-service typeorm migration:run -d ./src/data-source.ts
 ```
 
 `id SERIAL` tanımı sequence'i otomatik oluşturur; ayrıca elle CREATE SEQUENCE eklemek gerekmez. Migration dosyası depoda zaten varsa yeniden üretilmez. Swagger **WorkOrders** bölümünden başlık, gelecek bir son tarih ve opsiyonel açıklama/öncelikle deneyebilirsiniz.
+
+### Listeleme ve filtreler
+
+`GET /api/work-orders` sayfalı `{ data, total, page, limit }` yanıtı döndürür. `page` en az 1, `limit` 1–100 arasıdır; varsayılanlar 1 ve 10'dur. `total` filtreye uyan tüm kayıtları sayar; son sayfanın ötesinde `data: []` döner. Liste her üç role açıktır.
+
+| Parametre | Davranış |
+| --- | --- |
+| `search` | Kod veya başlıkta büyük/küçük harf duyarsız arama; baş/son boşluklar kırpılır, boş metin filtre uygulamaz. `%`, `_` ve `\` gerçek karakter olarak aranır. |
+| `status` | Tek veya tekrar eden parametre: `status=OPEN&status=ASSIGNED`. Seçilen durumlardan herhangi biri eşleşebilir. |
+| `priority`, `teamId` | Tek öncelik ve pozitif ekip ID filtresi. |
+| `overdue` | `true`: yalnız son tarihi geçmiş ve kapanmamış iş emirleri. `false` veya gönderilmemesi ek filtre uygulamaz. |
+| `sortBy` | Yalnız `createdAt`, `dueAt`, `priority`; varsayılan `createdAt`. |
+| `sortOrder` | `asc` veya `desc`; varsayılan `desc`. |
+
+Farklı filtreler AND ile birleşir; arama kendi içinde kod/başlık OR, çoklu durum kendi içinde OR kullanır. Öncelik sırası `LOW < MEDIUM < HIGH < URGENT` olarak açık CASE ifadesiyle belirlenir; `desc` en acili başa getirir. Eşit sıralama değerlerinde ID aynı yönde ikinci anahtardır; sayfalama kararlı kalır. SQL sıralaması sabit beyaz listeden seçilir; geçersiz alan/yön `400` döner.
+
+Her listede `team: { id, name }` veya `null` ve SQL'de hesaplanan `isOverdue` alanı bulunur. Atanmamış iş emirleri LEFT JOIN sayesinde listede kalır. `dueAt` sorgunun referans anından küçükse ve durum `COMPLETED`/`CANCELLED` değilse gecikmiştir. Tam eşit anda gecikmiş sayılmaz; kapanmış kayıtlarda her zaman `false` döner. Bu alan veritabanına kaydedilmez ve şema değişikliği gerektirmez.
+
+Örnek: `/api/work-orders?page=1&limit=10&status=OPEN&status=ASSIGNED&priority=HIGH&teamId=3&overdue=true&sortBy=priority&sortOrder=desc`.
 
 ### Durum geçişleri ve geçmiş
 

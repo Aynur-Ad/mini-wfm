@@ -1,3 +1,5 @@
+import { QueryWorkOrdersDto } from './dto/query-work-orders.dto.js';
+import { WorkOrderListDto } from './dto/work-order-list.dto.js';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
 import type { AuthUser } from '../auth/auth-user.js';
 import { ChangeWorkOrderStatusDto } from './dto/change-work-order-status.dto.js';
@@ -10,6 +12,7 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
@@ -50,6 +53,17 @@ export class WorkOrdersController {
   @ApiCreatedResponse({ type: WorkOrderResponseDto })
   create(@Body() dto: CreateWorkOrderDto) {
     return this.orders.create(dto);
+  }
+  @Get()
+  @Roles(AccountRole.ADMIN, AccountRole.PLANNER, AccountRole.VIEWER)
+  @ApiOperation({
+    summary: 'İş emirlerini filtreler ve sayfalı listeler',
+    description:
+      'İzin verilen roller: ADMIN, PLANNER, VIEWER. Filtreler AND ile birleşir; çoklu status kendi içinde OR. Öncelik desc: URGENT, HIGH, MEDIUM, LOW. overdue=false ek filtre uygulamaz.',
+  })
+  @ApiOkResponse({ type: WorkOrderListDto })
+  findAll(@Query() dto: QueryWorkOrdersDto) {
+    return this.orders.findAll(dto);
   }
   @Get(':id')
   @Roles(AccountRole.ADMIN, AccountRole.PLANNER, AccountRole.VIEWER)

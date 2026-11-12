@@ -34,6 +34,13 @@ const allRoles = Object.values(AccountRole);
 const adminOnly = [AccountRole.ADMIN];
 const routes = [
   {
+    method: 'get',
+    path: '/work-orders',
+    pattern: 'findAllWorkOrders',
+    roles: allRoles,
+    status: 200,
+  },
+  {
     method: 'patch',
     path: '/work-orders/1/status',
     pattern: 'changeWorkOrderStatus',
@@ -476,6 +483,59 @@ describe('HTTP rol izinleri — gerçek global guard ve controller akışı', ()
       expect(send).not.toHaveBeenCalled();
     },
   );
+
+  it('iş emri listesi çoklu durum ve tiplenmiş filtreleri TCPye taşır', async () => {
+    const response = {
+      data: [{ id: 7, team: null, isOverdue: true }],
+      total: 4,
+      page: 2,
+      limit: 1,
+    };
+    send.mockReturnValue(of(response));
+    const result = await request(app.getHttpServer())
+      .get(
+        '/api/work-orders?page=2&limit=1&status=OPEN&status=ASSIGNED&priority=HIGH&teamId=3&overdue=true&sortBy=priority&sortOrder=desc&search=Bakım',
+      )
+      .set('Authorization', `Bearer ${tokens.get(AccountRole.VIEWER)}`);
+    expect(result.status).toBe(200);
+    expect(result.body).toEqual(response);
+    expect(send).toHaveBeenCalledWith(
+      'findAllWorkOrders',
+      expect.objectContaining({
+        data: {
+          page: 2,
+          limit: 1,
+          status: ['OPEN', 'ASSIGNED'],
+          priority: 'HIGH',
+          teamId: 3,
+          overdue: true,
+          sortBy: 'priority',
+          sortOrder: 'desc',
+          search: 'Bakım',
+        },
+      }),
+    );
+  });
+
+  it.each([
+    { sortBy: 'name;DROP TABLE team' },
+    { sortBy: 'constructor' },
+    { sortOrder: 'DESC;DELETE' },
+    { status: 'UNKNOWN' },
+    { status: ['OPEN', 'UNKNOWN'] },
+    { overdue: 'yes' },
+    { limit: '101' },
+    { page: '0' },
+    { teamId: '-1' },
+    { priority: 'CRITICAL' },
+  ])('iş emri liste filtresi geçersizse TCPden önce 400: %j', async (query) => {
+    const result = await request(app.getHttpServer())
+      .get('/api/work-orders')
+      .query(query)
+      .set('Authorization', `Bearer ${tokens.get(AccountRole.VIEWER)}`);
+    expect(result.status).toBe(400);
+    expect(send).not.toHaveBeenCalled();
+  });
 
   it('vardiya listesi array döner; query filtreleri TCP verisine sayı olarak taşınır', async () => {
     const result = await request(app.getHttpServer())
