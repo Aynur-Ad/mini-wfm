@@ -1,3 +1,4 @@
+import { WorkOrdersModule } from './work-orders/work-orders.module.js';
 import { ShiftsModule } from './shifts/shifts.module.js';
 import { AccountsModule } from './accounts/accounts.module.js';
 import { Module } from '@nestjs/common';
@@ -21,6 +22,7 @@ import { WorkforceUsersModule } from './workforce_users/workforce_users.module.j
       inject: [ConfigService],
       useFactory: createDatabaseOptions,
     }),
+    WorkOrdersModule,
     ShiftsModule,
     AccountsModule,
     TeamsModule,

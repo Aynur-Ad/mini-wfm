@@ -1,3 +1,4 @@
+import { WorkOrder } from '../work-orders/entities/work-order.entity.js';
 import { HttpStatus } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
 import { Test, TestingModule } from '@nestjs/testing';
@@ -40,16 +41,22 @@ describe('TeamsService', () => {
 
   const mockTeam = createMockTeam();
 
+  const orders = { existsBy: vi.fn() };
   const people = { existsBy: vi.fn() };
 
   beforeEach(async () => {
     vi.clearAllMocks();
     people.existsBy.mockResolvedValue(false);
+    orders.existsBy.mockResolvedValue(false);
     mockTeamRepository.manager.transaction.mockImplementation(
       (work: (manager: unknown) => unknown) =>
         work({
           getRepository: (entity: unknown) =>
-            entity === WorkforceUser ? people : mockTeamRepository,
+            entity === WorkforceUser
+              ? people
+              : entity === WorkOrder
+                ? orders
+                : mockTeamRepository,
         }),
     );
 
@@ -257,6 +264,25 @@ describe('TeamsService', () => {
   });
 
   describe('remove', () => {
+    it('üyesi olmayan ekipte de açık iş emri varsa 409 verir', async () => {
+      mockTeamRepository.findOne.mockResolvedValue(mockTeam);
+      orders.existsBy.mockResolvedValue(true);
+      await expect(service.remove(1)).rejects.toMatchObject({
+        error: { statusCode: 409, message: 'Açık iş emri olan ekip silinemez' },
+      });
+      expect(mockTeamRepository.remove).not.toHaveBeenCalled();
+    });
+    it('kapanmış bağlı geçmişi de B12 gereği korur', async () => {
+      mockTeamRepository.findOne.mockResolvedValue(mockTeam);
+      orders.existsBy.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+      await expect(service.remove(1)).rejects.toMatchObject({
+        error: {
+          statusCode: 409,
+          message: 'İş emri geçmişi olan ekip silinemez',
+        },
+      });
+    });
+
     it('mevcut ekibi başarıyla siler', async () => {
       mockTeamRepository.findOne.mockResolvedValue(mockTeam);
       mockTeamRepository.remove.mockResolvedValue(mockTeam);

@@ -289,12 +289,14 @@ Kimlik doğrulamadan sonra rol kontrolü yapılır. Token geçerli olduğu halde
 | Vardiya listesi ve detayı | Evet | Evet | Evet |
 | Vardiya oluşturma, güncelleme ve silme | Hayır | Evet | Evet |
 | Ekibe toplu vardiya atama | Hayır | Evet | Evet |
+| İş emri detayı | Evet | Evet | Evet |
+| İş emri oluşturma ve güncelleme | Hayır | Evet | Evet |
 
 İzinler API controller'larında `@Roles(...)` ile tanımlanır. `JwtGuard` önce token'ı doğrular; ardından `RolesGuard` doğrulanan kullanıcının rolünü kontrol eder. `@Roles` tanımı olmayan endpoint'ler varsayılan olarak yalnızca admin'e açıktır. `@Public()` ile işaretli login ve health bu kontrolden muaftır. Hesap listesi GET olmasına rağmen yalnızca admin'e açıktır; yalnızca HTTP metoduna bakarak izin verilmez.
 
 Swagger'da admin hesabıyla giriş yapıp bir `VIEWER` ve bir `PLANNER` hesabı oluşturun. Her hesap için login'den token alın; Authorize içindeki önceki token'ı değiştirin. Viewer ekip listesini okuyabilmeli, ekip oluştururken `403` almalıdır. Planner da ekip/personel kayıtlarını okuyabilir; bunları değiştiremez ve hesap listesini göremez. Admin tüm mevcut işlemleri kullanabilir. Swagger endpoint açıklamaları izin verilen rolleri gösterir.
 
-Butonları arayüzde gizlemek doğrudan HTTP isteği gönderilmesini engellemez. İzin kontrolü backend'de yapılır ve yetkisiz istek workforce-service'e iletilmez. İş emri ve rapor endpoint'leri eklendiğinde kendi izinleri ayrıca tanımlanacaktır.
+Butonları arayüzde gizlemek doğrudan HTTP isteği gönderilmesini engellemez. İzin kontrolü backend'de yapılır ve yetkisiz istek workforce-service'e iletilmez. Rapor endpoint'leri eklendiğinde kendi izinleri ayrıca tanımlanacaktır.
 
 ### Servisler arasında kullanıcı bilgisi
 
@@ -487,6 +489,33 @@ pnpm --dir workforce-service typeorm migration:run -d ./src/data-source.ts
 
 Bu üretim komutu ilgili migration henüz yokken geliştirme sırasında bir kez kullanılır. Depodaki migration dosyaları zaten mevcutsa her kurulumda yeniden üretilmez; workforce-service açılışta bekleyen migration'ları uygular. Entegrasyon testleri gerçek migration dosyalarını boş bir Testcontainers veritabanına uygular; `synchronize` kullanılmaz.
 
+## İş emirleri
+
+İş emri bir ekibin yapacağı işi, önceliğini ve son tarihini temsil eder. `workforce.work_order` tablosunda tutulur. Oluşturulurken durum `OPEN`, ekip `null`, öncelik gönderilmezse `MEDIUM` olur. `createdById` doğrulanmış actor'dan alınır; istemci kod, durum, ekip veya oluşturan hesabı seçemez.
+
+| İşlem | Endpoint | Roller | Başarı |
+| --- | --- | --- | --- |
+| Oluşturma | POST `/api/work-orders` | ADMIN, PLANNER | 201 |
+| Detay | GET `/api/work-orders/:id` | ADMIN, PLANNER, VIEWER | 200 |
+| Kısmi güncelleme | PATCH `/api/work-orders/:id` | ADMIN, PLANNER | 200 |
+
+Başlık zorunludur, kırpılır ve en fazla 200 karakter olabilir. Açıklama opsiyoneldir, `null` ile temizlenebilir. Öncelik `LOW`, `MEDIUM`, `HIGH`, `URGENT` değerlerinden biridir. `dueAt` saat dilimi belirtilmiş ISO 8601 olmalı ve oluşturma/gönderilen yeni son tarihte geçmişte olmamalıdır (`400`). Tarihler UTC `Z` biçiminde döner.
+
+Kod `IE-2026-00001` biçimindedir. PostgreSQL'in `SERIAL` ID alanı için oluşturduğu sequence'ten `nextval` alınır ve aynı sayı ID ile kodda kullanılır. Paralel isteklerde `MAX(id)+1` hesabı yapılmaz. Sayı en az beş hanelidir; 99999 sonrasında kırpılmaz ve yıl değişiminde sıfırlanmaz. Kodun yıl bölümü sunucunun yerel ayarından bağımsız olarak UTC yılıdır. Sequence rollback ile geri alınmaz; hata sonrası numara boşlukları normaldir, aralıksız numaralandırma vaat edilmez.
+
+PATCH yalnızca `title`, `description`, `priority`, `dueAt` alanlarını kabul eder. Gönderilen `status`, `teamId`, `code`, `createdById` ve `version` alanları whitelist tarafından kaldırılır; servis de yalnız izinli alanları uygular. `COMPLETED` veya `CANCELLED` iş emri güncellenemez (`409`). Durum ve ekip atama akışı henüz eklenmemiştir. `version` alanı 1'den başlar; kayıt güncellendiğinde artar, istemcinin sürümünü kontrol etme kuralı henüz uygulanmaz.
+
+İş emri silme endpoint'i yoktur; geçmiş korunur. Açık iş emrine bağlı ekip üyesiz olsa da silinemez (`409`). B12 gereği kapanmış bağlı iş emri geçmişi de RESTRICT foreign key ile korunur; böyle bir ekipte de `409` döner.
+
+Geliştirme sırasında yeni iş emri migration'ını bir kez terminalden üretip inceleyin:
+
+```powershell
+pnpm --dir workforce-service migration:generate src/migrations/CreateWorkOrderTable
+pnpm --dir workforce-service typeorm migration:run -d ./src/data-source.ts
+```
+
+`id SERIAL` tanımı sequence'i otomatik oluşturur; ayrıca elle CREATE SEQUENCE eklemek gerekmez. Migration dosyası depoda zaten varsa yeniden üretilmez. Swagger **WorkOrders** bölümünden başlık, gelecek bir son tarih ve opsiyonel açıklama/öncelikle deneyebilirsiniz.
+
 ## Veritabanını inceleme
 
 DBeaver gibi bir araç için yerel bağlantı bilgileri:
@@ -499,7 +528,7 @@ DBeaver gibi bir araç için yerel bağlantı bilgileri:
 | User | postgres |
 | Password | mysecretpassword |
 
-Migration'lar çalıştıktan sonra `workforce` şemasında `team`, `workforce_user`, `account` ve `shift` tabloları görünür.
+Migration'lar çalıştıktan sonra `workforce` şemasında `team`, `workforce_user`, `account`, `shift` ve `work_order` tabloları görünür.
 
 ## Durdurma
 
