@@ -1,3 +1,4 @@
+import { DEFAULT_WORK_RULE_OPTIONS } from '../config/work-rules.config.js';
 import type { MockInstance } from 'vitest';
 import { DataSource } from 'typeorm';
 import type { Repository, SelectQueryBuilder } from 'typeorm';
@@ -43,7 +44,7 @@ describe('ShiftsService tarih aralığı sorgusu', () => {
     builder = repository.createQueryBuilder('shift');
     vi.spyOn(repository, 'createQueryBuilder').mockReturnValue(builder);
     execute = vi.spyOn(builder, 'getMany').mockResolvedValue([]);
-    service = new ShiftsService(repository);
+    service = new ShiftsService(repository, DEFAULT_WORK_RULE_OPTIONS);
   });
   afterEach(() => vi.restoreAllMocks());
 
