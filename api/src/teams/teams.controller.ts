@@ -1,3 +1,5 @@
+import { WorkRuleErrorDto } from '../shifts/dto/work-rule-error.dto.js';
+import { ApiExtraModels, getSchemaPath } from '@nestjs/swagger';
 import { CreateTeamShiftsDto } from '../shifts/dto/create-team-shifts.dto.js';
 import { ShiftResponseDto } from '../shifts/dto/shift-response.dto.js';
 import { TeamShiftConflictDto } from '../shifts/dto/team-shift-conflict.dto.js';
@@ -163,10 +165,16 @@ export class TeamsController {
   })
   @ApiBadRequestResponse({ description: 'Geçersiz ID, tarih veya süre' })
   @ApiNotFoundResponse({ description: 'Ekip bulunamadı' })
+  @ApiExtraModels(TeamShiftConflictDto, WorkRuleErrorDto)
   @ApiConflictResponse({
-    type: TeamShiftConflictDto,
+    schema: {
+      oneOf: [
+        { $ref: getSchemaPath(TeamShiftConflictDto) },
+        { $ref: getSchemaPath(WorkRuleErrorDto) },
+      ],
+    },
     description:
-      'Pasif ekip, aktif üye yok, geçmiş tarih veya üye vardiyalarında çakışma',
+      'Pasif ekip, aktif üye yok, geçmiş tarih, üye vardiyalarında çakışma veya çalışma kuralı ihlali. Kural details kayıtları personel bilgisi ve ihlal kodunu içerir; hiçbir üyeye kısmi kayıt yapılmaz.',
   })
   createShifts(
     @Param('id', ParseIntPipe) id: number,

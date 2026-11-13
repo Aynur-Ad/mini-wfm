@@ -1,3 +1,4 @@
+import { DEFAULT_WORK_RULE_OPTIONS } from '../config/work-rules.config.js';
 import { vi } from 'vitest';
 import { Team } from '../teams/entities/team.entity.js';
 import {
@@ -61,7 +62,10 @@ describe('ShiftsService — gerçek PostgreSQL', () => {
     } finally {
       await runner.release();
     }
-    service = new ShiftsService(database.dataSource.getRepository(Shift));
+    service = new ShiftsService(
+      database.dataSource.getRepository(Shift),
+      DEFAULT_WORK_RULE_OPTIONS,
+    );
     peopleService = new WorkforceUsersService(
       database.dataSource.getRepository(WorkforceUser),
     );
@@ -116,11 +120,19 @@ describe('ShiftsService — gerçek PostgreSQL', () => {
   it.each([
     [16, 22],
     [2, 8],
-  ])('uç uca %s–%s vardiyası çakışmaz', async (start, end) => {
-    await create();
-    await create(start, end);
-    expect(await database!.dataSource.getRepository(Shift).count()).toBe(2);
-  });
+  ])(
+    'uç uca %s–%s çakışma olmasa da REST nedeniyle reddedilir',
+    async (start, end) => {
+      await create();
+      await expect(create(start, end)).rejects.toMatchObject({
+        error: {
+          statusCode: 409,
+          details: [expect.objectContaining({ code: 'REST', value: 0 })],
+        },
+      });
+      expect(await database!.dataSource.getRepository(Shift).count()).toBe(1);
+    },
+  );
   it('farklı personelde aynı saatlere izin verir', async () => {
     await create();
     await create(8, 16, otherId);
@@ -143,9 +155,13 @@ describe('ShiftsService — gerçek PostgreSQL', () => {
   });
   it('PATCH başka vardiyayla çakışırsa kaydı değiştirmez', async () => {
     const item = await create();
-    await create(16, 22);
+    await create(31, 37);
     await expect(
-      service.update(item.id, { id: item.id, endAt: stamp(17) }),
+      service.update(item.id, {
+        id: item.id,
+        startAt: stamp(21),
+        endAt: stamp(33),
+      }),
     ).rejects.toMatchObject({ error: { statusCode: 409 } });
     expect((await service.findOne(item.id)).endAt.toISOString()).toBe(
       stamp(16),
@@ -173,10 +189,10 @@ describe('ShiftsService — gerçek PostgreSQL', () => {
   });
   it('eşzamanlı iki update aynı personele çakışan saatler yazamaz', async () => {
     const a = await create(2, 8);
-    const b = await create(16, 22);
+    const b = await create(56, 62);
     const results = await Promise.allSettled([
-      service.update(a.id, { id: a.id, startAt: stamp(9), endAt: stamp(15) }),
-      service.update(b.id, { id: b.id, startAt: stamp(10), endAt: stamp(16) }),
+      service.update(a.id, { id: a.id, startAt: stamp(28), endAt: stamp(34) }),
+      service.update(b.id, { id: b.id, startAt: stamp(29), endAt: stamp(35) }),
     ]);
     expect(
       results.filter((result) => result.status === 'fulfilled'),
@@ -302,8 +318,18 @@ describe('ShiftsService — gerçek PostgreSQL', () => {
 
     it('startAt artan, eşitlikte ID artan sıralama uygular', async () => {
       const late = await create(10, 18);
-      const early = await create(8, 9);
-      const sameStart = await create(8, 16, otherId);
+      const early = await create(8, 9, otherId);
+      const sameStart = await create(
+        8,
+        16,
+        (
+          await database!.dataSource.getRepository(WorkforceUser).save({
+            firstName: 'Liste',
+            lastName: 'Üç',
+            registrationNumber: 'LIST-THIRD',
+          })
+        ).id,
+      );
       expect((await list(0, 24)).map((row) => row.id)).toEqual([
         early.id,
         sameStart.id,
@@ -377,11 +403,11 @@ describe('ShiftsService — gerçek PostgreSQL', () => {
 
     it('çok kayıt olsa da liste, personel ve ekip için tek SELECT çalıştırır', async () => {
       await create(8, 16);
-      await create(16, 22);
+      await create(31, 37);
       await create(8, 16, otherId);
       const spy = vi.spyOn(database!.dataSource.logger, 'logQuery');
       try {
-        const result = await list(0, 24);
+        const result = await list(0, 48);
         expect(result).toHaveLength(3);
         expect(spy).toHaveBeenCalledTimes(1);
         expect(spy.mock.calls[0][0]).toContain('JOIN');
@@ -503,7 +529,13 @@ describe('ShiftsService — gerçek PostgreSQL', () => {
 
     it('bütün çakışan üyeleri döndürür; aynı kişinin iki vardiyası details kaydını çoğaltmaz', async () => {
       await create(8, 10, personId);
-      await create(12, 14, personId);
+      // Liste/çakışma tekilleştirmesini mevcut (eski) veride de sınar.
+      await database!.dataSource.getRepository(Shift).insert({
+        workforceUserId: personId,
+        createdById: adminId,
+        startAt: new Date(stamp(12)),
+        endAt: new Date(stamp(14)),
+      });
       await create(8, 16, thirdId);
       await expect(bulk()).rejects.toMatchObject({
         error: {
@@ -533,14 +565,12 @@ describe('ShiftsService — gerçek PostgreSQL', () => {
     });
 
     it('pasif üyenin çakışan eski vardiyası aktif üyelerin atamasını engellemez', async () => {
-      await database!.dataSource
-        .getRepository(Shift)
-        .insert({
-          workforceUserId: inactiveId,
-          createdById: adminId,
-          startAt: new Date(stamp(8)),
-          endAt: new Date(stamp(16)),
-        });
+      await database!.dataSource.getRepository(Shift).insert({
+        workforceUserId: inactiveId,
+        createdById: adminId,
+        startAt: new Date(stamp(8)),
+        endAt: new Date(stamp(16)),
+      });
       const result = await bulk();
       expect(result).toHaveLength(3);
       expect(
@@ -550,10 +580,21 @@ describe('ShiftsService — gerçek PostgreSQL', () => {
       ).toBe(1);
     });
 
-    it('uç uca başlayan toplu vardiya çakışma sayılmaz', async () => {
+    it('uç uca toplu atama REST ihlalinde tüm üyeler için geri çevrilir', async () => {
       await create(2, 8);
-      expect(await bulk(8, 16)).toHaveLength(3);
-      expect(await database!.dataSource.getRepository(Shift).count()).toBe(4);
+      await expect(bulk(8, 16)).rejects.toMatchObject({
+        error: {
+          statusCode: 409,
+          details: [
+            expect.objectContaining({
+              code: 'REST',
+              workforceUserId: personId,
+              value: 0,
+            }),
+          ],
+        },
+      });
+      expect(await database!.dataSource.getRepository(Shift).count()).toBe(1);
     });
 
     it('pasif ekipte 409 verir ve hiç yazmaz', async () => {

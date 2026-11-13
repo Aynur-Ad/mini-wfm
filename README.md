@@ -220,7 +220,7 @@ pnpm --dir workforce-service test:int
 
 Normal `pnpm --dir workforce-service test` yalnızca unit testleri çalıştırır ve Docker gerektirmez. Entegrasyon testleri `src/test` altında `.int-spec.ts` uzantısıyla bulunur ve ayrı `vitest.config.int.ts` ayarıyla çalışır.
 
-Testler ekip adı tekilliğini, arama/sayfalamayı, üyelik/silme kurallarını, kullanıcı hesaplarını ve vardiya çakışmalarını kontrol eder. Vardiyalarda uç uca saatler, kendini hariç tutan güncelleme, paralel create/update ve personel silme FK kuralı da sınanır. Liste sorgusunda gece vardiyası, aralık sınırları, birlikte filtreleme, güncel ekip sınırlaması ve tek SELECT ile ilişkili verinin yüklenmesi doğrulanır. Toplu atamada tüm çakışan üyeler, pasif üyelerin hariç tutulması, eşzamanlı istekler ve DB hatasında hiçbir kayıt kalmaması da sınanır. Migration'ların geri alınıp tekrar uygulanması ayrıca doğrulanır. Unit testlerden farklı olarak repository ve PostgreSQL bağlantısı gerçektir.
+Testler ekip adı tekilliğini, arama/sayfalamayı, üyelik/silme kurallarını, kullanıcı hesaplarını ve vardiya çakışmalarını kontrol eder. Vardiyalarda uç uca saatlerin REST ile reddedilmesi, kendini hariç tutan güncelleme, paralel create/update ve personel silme FK kuralı da sınanır. Liste sorgusunda gece vardiyası, aralık sınırları, birlikte filtreleme, güncel ekip sınırlaması ve tek SELECT ile ilişkili verinin yüklenmesi doğrulanır. Toplu atamada tüm çakışan üyeler, pasif üyelerin hariç tutulması, eşzamanlı istekler ve DB hatasında hiçbir kayıt kalmaması da sınanır. Dinlenme, haftalık süre ve ardışık gün kuralları; sınır anları, güncellemede eski kaydın dışlanması, toplu atama ve eşzamanlı dinlenme ihlalleri de sınanır. Migration'ların geri alınıp tekrar uygulanması ayrıca doğrulanır. Unit testlerden farklı olarak repository ve PostgreSQL bağlantısı gerçektir.
 
 Geliştirme veritabanından bağımsızlığı doğrulamak için uygulamaları durdurup `docker compose stop postgres` çalıştırın; ardından `test:int` komutunu tekrar çalıştırın. Compose verileri korunur. Normal geliştirmeye dönmek için `docker compose up -d` kullanın.
 
@@ -432,9 +432,40 @@ Vardiya bir personelin başlangıç ve bitiş anları arasındaki çalışma kay
 
 Vardiya en az 1, en fazla 12 saat sürmelidir (`400`). Geçmişe ekleme veya başlangıcı geçmiş vardiyayı güncelleme/silme `409` döndürür; başlamış vardiya geleceğe taşınarak bu kural aşılamaz. Personel yoksa `404`, hedef personel pasifse `409` döner. Pasif personele ait vardiyayı silmek için de önce personelin aktif olması gerekir.
 
-Aynı personelin aralıkları `mevcut.startAt < yeni.endAt && mevcut.endAt > yeni.startAt` ise çakışır. Örneğin 08:00–16:00 ile 12:00–20:00 çakışır; 16:00–22:00 çakışmaz. Çakışma yanıtı `409` ve çakışan vardiyanın UTC saatlerini içerir. Kendi saatleriyle güncellemede aynı vardiya çakışma sayılmaz. Personel satırı transaction içinde kilitlenerek eşzamanlı API yazmalarının kontrolü atlaması önlenir.
+Aynı personelin aralıkları `mevcut.startAt < yeni.endAt && mevcut.endAt > yeni.startAt` ise çakışır. Örneğin 08:00–16:00 ile 12:00–20:00 çakışır; 16:00–22:00 aralık olarak çakışmaz, ancak yeni atamada 11 saat dinlenme kuralına aykırı olduğu için REST hatasıyla reddedilir. Çakışma yanıtı `409` ve çakışan vardiyanın UTC saatlerini içerir. Kendi saatleriyle güncellemede aynı vardiya çakışma sayılmaz. Personel satırı transaction içinde kilitlenerek eşzamanlı API yazmalarının kontrolü atlaması önlenir.
 
 Vardiyası olan personel, vardiya geçmişte olsa da silinemez (`409`). Foreign key doğrudan SQL ile silmeyi de engeller. Takvim arayüzü henüz eklenmemiştir; kontroller Swagger'daki **Shifts** bölümünden yapılır.
+
+### Dinlenme ve çalışma sınırları
+
+Vardiya oluşturma, güncelleme ve ekibe toplu atamada şu kurallar uygulanır. Çakışma ve mevcut 1–12 saat/geçmiş tarih kuralları da geçerlidir.
+
+| Kod | Varsayılan kural | Sınır örneği |
+| --- | --- | --- |
+| REST | Ardışık iki vardiya arasında en az 11 saat dinlenme | Tam 11 saat kabul edilir; 6 saat reddedilir. |
+| WEEKLY_LIMIT | Yerel pazartesi 00:00'dan sonraki pazartesi 00:00'a en fazla 60 saat | Tam 60 kabul edilir; 66 reddedilir. |
+| CONSECUTIVE_DAYS | En fazla 6 yerel gün üst üste çalışma | 7 gün reddedilir; boş gün seriyi keser. |
+
+Hesaplar `common/calc/interval.ts` ve `shifts/calc/work-rules.ts` içindeki saf fonksiyonlardadır. NestJS, TypeORM veya tarih kütüphanesine bağlı değildir; verilen diziler ve Date nesneleri değiştirilmez. Vardiyalar personel bazında gruplanıp bir kopya üzerinde sıralanır. Yalnız aday vardiyaların etkilediği çiftler, haftalar ve gün serileri raporlanır; uzak/eski bir ihlal ilgisiz atamayı engellemez. REST'in for referans çözümü ve servis tarafından kullanılan dizi çözümü aynı tablo örnekleriyle karşılaştırılır. İkisi de aynı karmaşıklıktadır; dizi sürümü sonuç birleştirmeyi kısaltır, for sürümü ardışık eleman karşılaştırmasını adım adım okumayı kolaylaştırır.
+
+Vardiyalar `[startAt, endAt)` kabul edilir. Gece yarısını geçen vardiya iki güne dokunur; tam gece yarısında biten vardiya ertesi günü çalışılmış saymaz. Aynı günün birden fazla vardiyası gün sayısını artırmaz. Pazar 22:00–Pazartesi 06:00 vardiyası önceki haftaya 2, sonraki haftaya 6 saat yazar. Gün/hafta sınırları işletim sisteminin saat diliminden bağımsız, ayardaki sabit UTC farkıyla hesaplanır. Türkiye için UTC+3 kullanılır; yaz saati değişen bölgeleri bu sabit fark modeli desteklemez.
+
+Süre hesabı dakika cinsindendir; normal dakika hassasiyetindeki girdiler tam dakika üretir. Mevcut ISO tarih sözleşmesinin kabul ettiği saniyeli girdilerde süre aşağı yuvarlanmaz: kesirli dakika korunur, böylece 11 saatten 1 saniye eksik dinlenme yanlışlıkla kabul edilmez. Saat dönüşümü ve 1 ondalık yuvarlama yalnız hata yanıtını oluştururken yapılır; kararlar yuvarlanmamış değere dayanır. `actualMinutes` ve `limitMinutes` ham süreyi de taşır.
+
+İhlalde `409`, `Vardiya çalışma kurallarına uymuyor` mesajı ve `details` listesi döner. Her detay `code`, `workforceUserId`, ilgili mevcut/yeni vardiyaların ID ve UTC saatleri, `value`, `limit`, `unit` ve Türkçe mesaj içerir. Süreler yanıtta saat, gün serileri gün cinsindedir. Haftalık ihlalde `weekStart`, ardışık gün ihlalinde `fromDate`/`toDate` yerel tarihleri bulunur. Toplu atamada ad, soyad ve sicil de eklenir; bir üye ihlal ediyorsa hiçbir üyeye kayıt yapılmaz.
+
+Service, aday başlangıcının 7 gün öncesi ile aday bitişinin 7 gün sonrası arasında kesişen vardiyaları okur. Güncellemede eski vardiya ID'si hem çakışma hem çalışma kuralı sorgusundan çıkarılır. Ekip atamasında bütün üyelerin gerekli kayıtları tek sorguda okunur. Kontrol ve kayıt aynı transaction içindedir; personel kilitleri eşzamanlı tekil/toplu isteklerin kontrolü aşmasını engeller. Bu uygulama kuralları doğrudan SQL yazımlarını kapsamaz; çapraz vardiya sınırları bir veritabanı CHECK kısıtı değildir.
+
+Aşağıdaki ayarlar workforce-service açılırken doğrulanır; `.env` içinde yoksa varsayılanlar kullanılır. Yeni ayar için mevcut migration'lar değiştirilmez.
+
+| Ayar | Varsayılan | Geçerli aralık |
+| --- | --- | --- |
+| TIMEZONE_OFFSET_MINUTES | 180 | -840–840 tam sayı dakika |
+| MIN_REST_HOURS | 11 | 1–24 tam sayı saat |
+| MAX_WEEKLY_HOURS | 60 | 1–168 tam sayı saat |
+| MAX_CONSECUTIVE_DAYS | 6 | 1–6 tam sayı gün |
+
+Ardışık gün ayarının üst sınırı, 7 günlük kontrol penceresinin kuralı güvenle saptamasını korur. Hesap fonksiyonu saat farkı ve limitleri options üzerinden alır; servis doğrulanmış ConfigService değerlerini bu options'a aktarır.
 
 ### Ekibe toplu vardiya atama
 
@@ -461,7 +492,7 @@ Atama tek transaction içindedir. Üyelik işlemleriyle aynı sırada önce ekip
 
 `details` tüm çakışan aktif üyeleri, personel başına tek kayıtla içerir; yalnızca ilk çakışma döndürülmez. Bu alanı taşımayan eski hatalar `{ statusCode, message }` biçiminde kalır. Şifre, token veya telefon gibi alanlar details'e eklenmez; details istek/hata loglarına yazılmaz.
 
-Swagger'da üç aktif üyeli bir ekip oluşturun. Bir üyeye tekil vardiya ekleyip aynı saatlere toplu atamayı deneyin: `409` ve ilgili personelin adı/sicili dönmeli. `GET /api/shifts` veya DBeaver'dan diğer üyelere hiçbir yeni kayıt yazılmadığını doğrulayın. Çakışmayan saatlerle deneyince aktif üye sayısı kadar vardiya ve `201` beklenir. Pasif üyeye vardiya eklenmemelidir.
+Swagger'da üç aktif üyeli bir ekip oluşturun. Bir üyeye tekil vardiya ekleyip aynı saatlere toplu atamayı deneyin: `409` ve ilgili personelin adı/sicili dönmeli. `GET /api/shifts` veya DBeaver'dan diğer üyelere hiçbir yeni kayıt yazılmadığını doğrulayın. Çakışmayan ve çalışma kurallarına uyan saatlerle deneyince aktif üye sayısı kadar vardiya ve `201` beklenir. Pasif üyeye vardiya eklenmemelidir.
 
 ### Tarih aralığına göre vardiya listesi
 

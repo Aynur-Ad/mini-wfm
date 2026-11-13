@@ -1,3 +1,4 @@
+import { workRulesOptions } from './work-rules.config.js';
 import { randomUUID } from 'node:crypto';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
@@ -117,4 +118,55 @@ describe('İlk yönetici ayarları', () => {
         .INITIAL_ADMIN_USERNAME,
     ).toBe('admin');
   });
+});
+
+describe('Çalışma kuralı ayarları', () => {
+  it('üretim factorysi doğrulanmış ConfigService değerlerini optionsa taşır', () => {
+    const config = new ConfigService<Environment, true>(
+      validateEnvironment(valid),
+    );
+    expect(workRulesOptions(config)).toEqual({
+      timezoneOffsetMinutes: 180,
+      minRestHours: 11,
+      maxWeeklyHours: 60,
+      maxConsecutiveDays: 6,
+    });
+  });
+  it('varsayılanları sayı olarak doğrular', () => {
+    expect(validateEnvironment(valid)).toMatchObject({
+      TIMEZONE_OFFSET_MINUTES: 180,
+      MIN_REST_HOURS: 11,
+      MAX_WEEKLY_HOURS: 60,
+      MAX_CONSECUTIVE_DAYS: 6,
+    });
+  });
+  it.each([
+    ['TIMEZONE_OFFSET_MINUTES', 'abc'],
+    ['TIMEZONE_OFFSET_MINUTES', '841'],
+    ['TIMEZONE_OFFSET_MINUTES', '-841'],
+    ['TIMEZONE_OFFSET_MINUTES', '1.5'],
+    ['MIN_REST_HOURS', '0'],
+    ['MIN_REST_HOURS', '25'],
+    ['MAX_WEEKLY_HOURS', '169'],
+    ['MAX_WEEKLY_HOURS', ''],
+    ['MAX_CONSECUTIVE_DAYS', '0'],
+    ['MAX_CONSECUTIVE_DAYS', '7'],
+  ])('%s hatalı değeri reddeder', (key, value) =>
+    expect(() => validateEnvironment({ ...valid, [key]: value })).toThrow(key),
+  );
+  it('metin ayarları sayıya çevirir; UTC offset sıfır olabilir', () =>
+    expect(
+      validateEnvironment({
+        ...valid,
+        TIMEZONE_OFFSET_MINUTES: '0',
+        MIN_REST_HOURS: '12',
+        MAX_WEEKLY_HOURS: '48',
+        MAX_CONSECUTIVE_DAYS: '5',
+      }),
+    ).toMatchObject({
+      TIMEZONE_OFFSET_MINUTES: 0,
+      MIN_REST_HOURS: 12,
+      MAX_WEEKLY_HOURS: 48,
+      MAX_CONSECUTIVE_DAYS: 5,
+    }));
 });

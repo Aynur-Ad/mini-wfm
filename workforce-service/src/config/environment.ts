@@ -1,8 +1,13 @@
+import { DEFAULT_WORK_RULE_OPTIONS } from './work-rules.config.js';
 import {
   isValidPassword,
   normalizeUsername,
 } from '../accounts/password-policy.js';
 export interface Environment {
+  TIMEZONE_OFFSET_MINUTES: number;
+  MIN_REST_HOURS: number;
+  MAX_WEEKLY_HOURS: number;
+  MAX_CONSECUTIVE_DAYS: number;
   INITIAL_ADMIN_USERNAME: string;
   INITIAL_ADMIN_PASSWORD: string;
   WORKFORCE_HOST: string;
@@ -14,10 +19,39 @@ export interface Environment {
   DB_NAME: string;
 }
 
-type Setting = { type: 'string' | 'port'; default?: string | number };
+type Setting = {
+  type: 'string' | 'port' | 'integer';
+  default?: string | number;
+  min?: number;
+  max?: number;
+};
 
 // Her uygulama yalnızca kendi ihtiyaç duyduğu ayarları tanımlar.
 const schema: Record<keyof Environment, Setting> = {
+  TIMEZONE_OFFSET_MINUTES: {
+    type: 'integer',
+    default: DEFAULT_WORK_RULE_OPTIONS.timezoneOffsetMinutes,
+    min: -840,
+    max: 840,
+  },
+  MIN_REST_HOURS: {
+    type: 'integer',
+    default: DEFAULT_WORK_RULE_OPTIONS.minRestHours,
+    min: 1,
+    max: 24,
+  },
+  MAX_WEEKLY_HOURS: {
+    type: 'integer',
+    default: DEFAULT_WORK_RULE_OPTIONS.maxWeeklyHours,
+    min: 1,
+    max: 168,
+  },
+  MAX_CONSECUTIVE_DAYS: {
+    type: 'integer',
+    default: DEFAULT_WORK_RULE_OPTIONS.maxConsecutiveDays,
+    min: 1,
+    max: 6,
+  },
   INITIAL_ADMIN_USERNAME: { type: 'string', default: 'admin' },
   INITIAL_ADMIN_PASSWORD: { type: 'string' },
   WORKFORCE_HOST: { type: 'string', default: '127.0.0.1' },
@@ -49,7 +83,19 @@ export function validateEnvironment(
       continue;
     }
 
-    if (rule.type === 'port') {
+    if (rule.type === 'integer') {
+      const number = Number(value);
+      if (
+        !/^-?\d+$/.test(String(value)) ||
+        !Number.isInteger(number) ||
+        number < rule.min! ||
+        number > rule.max!
+      )
+        errors.push(
+          `${key}: ${rule.min} ile ${rule.max} arasında tam sayı olmalıdır.`,
+        );
+      else result[key] = number;
+    } else if (rule.type === 'port') {
       const port = Number(value);
       if (
         !/^\d+$/.test(String(value)) ||

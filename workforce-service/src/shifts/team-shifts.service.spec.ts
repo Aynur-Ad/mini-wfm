@@ -1,3 +1,4 @@
+import { DEFAULT_WORK_RULE_OPTIONS } from '../config/work-rules.config.js';
 import { In, LessThan, MoreThan } from 'typeorm';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { ShiftsService } from './shifts.service.js';
@@ -77,7 +78,10 @@ describe('Ekibe toplu vardiya — ShiftsService', () => {
     transactionRepository.save.mockImplementation((rows: Shift[]) =>
       Promise.resolve(rows),
     );
-    service = new ShiftsService(outer as unknown as Repository<Shift>);
+    service = new ShiftsService(
+      outer as unknown as Repository<Shift>,
+      DEFAULT_WORK_RULE_OPTIONS,
+    );
   });
   afterEach(() => vi.useRealTimers());
 
@@ -200,6 +204,33 @@ describe('Ekibe toplu vardiya — ShiftsService', () => {
       error: { statusCode: 401 },
     });
     expect(transaction).not.toHaveBeenCalled();
+  });
+  it('bir üyenin REST ihlalinde kimliği details içinde gelir; ekibin hiçbir üyesi kaydedilmez', async () => {
+    transactionRepository.find
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          id: 1,
+          workforceUserId: 2,
+          startAt: new Date('2099-01-01T15:00:00Z'),
+          endAt: new Date('2099-01-01T23:00:00Z'),
+        },
+      ]);
+    await expect(run()).rejects.toMatchObject({
+      error: {
+        statusCode: 409,
+        details: [
+          expect.objectContaining({
+            code: 'REST',
+            workforceUserId: 2,
+            registrationNumber: 'P2',
+            firstName: 'Ece',
+            value: 6,
+          }),
+        ],
+      },
+    });
+    expect(transactionRepository.save).not.toHaveBeenCalled();
   });
   it('DB save hatasını yutmaz; transaction rollback yapabilsin diye dışarı taşır', async () => {
     const error = new Error('write failed');

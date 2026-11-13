@@ -1,8 +1,15 @@
+import { WORK_RULE_OPTIONS } from '../config/work-rules.config.js';
+import { checkWorkRules } from './calc/work-rules.js';
+import type {
+  WorkRulesOptions,
+  WorkRuleViolation,
+  RuleShift,
+} from './calc/work-rules.js';
 import type { CreateTeamShiftsDto } from './dto/create-team-shifts.dto.js';
 import { Team } from '../teams/entities/team.entity.js';
 import type { ShiftListItem } from './dto/shift-list-item.dto.js';
 import type { QueryShiftsDto } from './dto/query-shifts.dto.js';
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, LessThan, MoreThan, Not } from 'typeorm';
@@ -22,6 +29,7 @@ function fail(statusCode: number, message: string): never {
 export class ShiftsService {
   constructor(
     @InjectRepository(Shift) private readonly shifts: Repository<Shift>,
+    @Inject(WORK_RULE_OPTIONS) private readonly ruleOptions: WorkRulesOptions,
   ) {}
 
   async create(dto: CreateShiftDto): Promise<Shift> {
@@ -39,6 +47,11 @@ export class ShiftsService {
       this.checkFuture(startAt);
       const repository = manager.getRepository(Shift);
       await this.checkOverlap(repository, dto.workforceUserId, startAt, endAt);
+      this.rejectWorkRules(
+        await this.workRuleViolations(repository, [
+          { workforceUserId: dto.workforceUserId, startAt, endAt },
+        ]),
+      );
       return repository.save(
         repository.create({
           workforceUserId: dto.workforceUserId,
@@ -113,6 +126,16 @@ export class ShiftsService {
           details,
         });
       }
+      const violations = await this.workRuleViolations(
+        repository,
+        members.map((member) => ({
+          workforceUserId: member.id,
+          startAt,
+          endAt,
+        })),
+      );
+      const byId = new Map(members.map((member) => [member.id, member]));
+      this.rejectWorkRules(violations, byId);
       // Üye başına create() çağırmak ayrı transaction'lar açardı. Tüm kontrol ve
       // kayıtlar aynı manager/repository ve tek transaction içinde tutulur.
       const shifts = members.map((member) =>
@@ -233,6 +256,13 @@ export class ShiftsService {
       this.checkInterval(startAt, endAt);
       this.checkFuture(startAt);
       await this.checkOverlap(repository, targetId, startAt, endAt, id);
+      this.rejectWorkRules(
+        await this.workRuleViolations(
+          repository,
+          [{ id, workforceUserId: targetId, startAt, endAt }],
+          id,
+        ),
+      );
       // createdById yalnızca create sırasında actor'dan gelir; güncellemede korunur.
       shift.workforceUserId = targetId;
       shift.startAt = startAt;
@@ -262,6 +292,80 @@ export class ShiftsService {
       this.checkFuture(shift.startAt);
       await repository.remove(shift);
       return { deleted: true, id };
+    });
+  }
+
+  private async workRuleViolations(
+    repository: Repository<Shift>,
+    added: RuleShift[],
+    excludedId?: number,
+  ): Promise<WorkRuleViolation[]> {
+    // Tek sorgu, tüm aday personeller. Eski PATCH kaydı DB sorgusunda dışlanır.
+    const margin = 7 * 24 * 60 * 60_000;
+    const from = new Date(
+      Math.min(...added.map((shift) => shift.startAt.getTime())) - margin,
+    );
+    const to = new Date(
+      Math.max(...added.map((shift) => shift.endAt.getTime())) + margin,
+    );
+    const existing = await repository.find({
+      select: { id: true, workforceUserId: true, startAt: true, endAt: true },
+      where: {
+        workforceUserId: In([
+          ...new Set(added.map((shift) => shift.workforceUserId)),
+        ]),
+        startAt: LessThan(to),
+        endAt: MoreThan(from),
+        ...(excludedId === undefined ? {} : { id: Not(excludedId) }),
+      },
+      order: { startAt: 'ASC', id: 'ASC' },
+    });
+    return checkWorkRules(existing, added, this.ruleOptions);
+  }
+
+  private rejectWorkRules(
+    violations: WorkRuleViolation[],
+    members?: ReadonlyMap<
+      number,
+      { registrationNumber: string; firstName: string; lastName: string }
+    >,
+  ): void {
+    if (violations.length === 0) return;
+    // P10: dakika hesabı biter; saat dönüşümü/1 ondalık yalnız yanıt sınırındadır.
+    const details = violations.map((violation) => {
+      const hours = (minutes: number) => Math.round((minutes / 60) * 10) / 10;
+      const value =
+        violation.unit === 'minutes' ? hours(violation.value) : violation.value;
+      const limit =
+        violation.unit === 'minutes' ? hours(violation.limit) : violation.limit;
+      const messages = {
+        REST: `Dinlenme süresi ${value} saat${violation.value < violation.limit && value >= limit ? ' (sınırın altında)' : ''}; en az ${limit} saat olmalıdır`,
+        WEEKLY_LIMIT: `Haftalık çalışma ${value} saat${violation.value > violation.limit && value <= limit ? ' (sınırın üstünde)' : ''}; en fazla ${limit} saat olabilir`,
+        CONSECUTIVE_DAYS: `Ardışık çalışma ${value} gün; en fazla ${limit} gün olabilir`,
+      };
+      const member = members?.get(violation.workforceUserId);
+      return {
+        ...violation,
+        ...(violation.unit === 'minutes'
+          ? { actualMinutes: violation.value, limitMinutes: violation.limit }
+          : {}),
+        value,
+        limit,
+        unit: violation.unit === 'minutes' ? 'hours' : 'days',
+        message: messages[violation.code],
+        ...(member
+          ? {
+              registrationNumber: member.registrationNumber,
+              firstName: member.firstName,
+              lastName: member.lastName,
+            }
+          : {}),
+      };
+    });
+    throw new RpcException({
+      statusCode: 409,
+      message: 'Vardiya çalışma kurallarına uymuyor',
+      details,
     });
   }
 
