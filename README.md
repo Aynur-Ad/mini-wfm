@@ -651,3 +651,10 @@ Volume silinmediği için veriler korunur.
 | Web açılıyor ama veriler gelmiyor | API ve workforce-service açık mı kontrol edin. Vite proxy hedefi varsayılan API portu 3000'dir. |
 | Swagger açılmıyor | API terminalindeki başlangıç hatalarını ve API portunu kontrol edin. |
 | vite-tsconfig-paths uyarısı | Test sonucundaki hata/başarı bölümünü kontrol edin; bu mesaj tek başına testlerin başarısız olduğunu göstermez. |
+### Aylık puantaj
+
+GET `/api/workforce-users/:id/timesheet?month=2026-11` üç role açıktır. 2026–2027 takvimi desteklenir; diğer yıllar sessizce tatilsiz hesaplanmaz, 400 döner. Günlük satırlar boş günler dahil toplam/gece/tatil/hafta sonu/fazla mesai saatlerini ve ay toplamlarını içerir. Haftalık `total`/`overtime` tam haftaya, `monthTotal`/`monthOvertime` ay içine aittir. Gece 20–06, yarım tatil 13:00 sonrası, fazla mesai haftalık 45 saat sonrasıdır. Tatil hafta sonuna önceliklidir; gece ve fazla mesai diğer kategorilerle kesişebilir. Servis ayın dokunduğu tam haftaları okur. Hesaplar dakika cinsindedir; saat ve 1 ondalık dönüşüm yalnız yanıt sınırında yapılır. Sabit UTC farkı ayardan gelir; yaz saati desteklenmez.
+
+Üretim `shifts/calc/timesheet.ts` sınır bölme algoritmasını kullanır. Dakika referansı yalnız `src/test/timesheet.reference.ts` içindedir ve üretim build'ine dahil değildir. 200 sabit seed'li ayda sonuçlar karşılaştırılır. Ölçüm: `pnpm --dir workforce-service exec node --import tsx scripts/benchmark-timesheet.ts`. 1000 personel × 22 vardiya × bir ay ölçümünde bu ortamda referans 7171.07 ms, bölme 111.65 ms; donanım/yük sonucu etkiler.
+
+Tatil kaynakları: [Borsa İstanbul 2026](https://www.borsaistanbul.com/resmi-tatil-gunleri), [Diyanet](https://diyanet.gov.tr/dini-gun-geceler), [DHMİ 2027](https://dhmi.gov.tr/AIPDocuments/LT_GEN_2_1_en.pdf). İdari izinler resmi tatil sayılmaz; 2027-05-19 bir kez sayılır.

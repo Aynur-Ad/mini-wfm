@@ -1,3 +1,5 @@
+import { ShiftPlanningController } from './shift-planning.controller.js';
+import { ShiftPlanningService } from './shift-planning.service.js';
 import { ConfigService } from '@nestjs/config';
 import {
   WORK_RULE_OPTIONS,
@@ -11,9 +13,10 @@ import { ShiftsService } from './shifts.service.js';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Shift])],
-  controllers: [ShiftsController],
+  controllers: [ShiftsController, ShiftPlanningController],
   providers: [
     ShiftsService,
+    ShiftPlanningService,
     {
       provide: WORK_RULE_OPTIONS,
       useFactory: workRulesOptions,

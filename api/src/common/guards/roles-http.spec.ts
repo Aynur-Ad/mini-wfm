@@ -35,6 +35,14 @@ const adminOnly = [AccountRole.ADMIN];
 const routes = [
   {
     method: 'get',
+    path: '/workforce-users/1/timesheet',
+    pattern: 'findWorkforceUserTimesheet',
+    roles: allRoles,
+    status: 200,
+    query: { month: '2026-11' },
+  },
+  {
+    method: 'get',
     path: '/work-orders',
     pattern: 'findAllWorkOrders',
     roles: allRoles,

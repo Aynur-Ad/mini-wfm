@@ -1,3 +1,5 @@
+import { QueryTimesheetDto } from './dto/query-timesheet.dto.js';
+import { TimesheetDto } from './dto/timesheet.dto.js';
 import { Roles } from '../common/decorators/roles.decorator.js';
 import { AccountRole } from '../accounts/account-role.js';
 import {
@@ -90,6 +92,22 @@ export class WorkforceUsersController {
     return this.workforceUsersService.findAll(query);
   }
 
+  @Get(':id/timesheet')
+  @Roles(AccountRole.ADMIN, AccountRole.PLANNER, AccountRole.VIEWER)
+  @ApiOperation({
+    summary: 'Aylık puantajı getirir',
+    description:
+      'İzin verilen roller: ADMIN, PLANNER, VIEWER. Saatler 1 ondalık; boş günler sıfır. Haftalık toplam tam hafta, monthTotal ay içi payıdır.',
+  })
+  @ApiOkResponse({ type: TimesheetDto })
+  @ApiBadRequestResponse({ description: 'Geçersiz ay veya desteklenmeyen yıl' })
+  @ApiNotFoundResponse({ description: 'Personel bulunamadı' })
+  timesheet(
+    @Param('id', ParseIntPipe) id: number,
+    @Query() dto: QueryTimesheetDto,
+  ) {
+    return this.workforceUsersService.timesheet(id, dto.month);
+  }
   @Get(':id')
   @Roles(AccountRole.ADMIN, AccountRole.PLANNER, AccountRole.VIEWER)
   @ApiOperation({

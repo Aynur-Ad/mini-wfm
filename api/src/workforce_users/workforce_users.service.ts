@@ -1,3 +1,4 @@
+import type { TimesheetDto } from './dto/timesheet.dto.js';
 import { Inject, Injectable } from '@nestjs/common';
 import { WorkforceClient } from '../common/clients/workforce-client.js';
 import { Observable } from 'rxjs';
@@ -24,6 +25,12 @@ export class WorkforceUsersService {
     return this.workforceClient.send('findAllWorkforceUsers', query);
   }
 
+  timesheet(id: number, month: string) {
+    return this.workforceClient.send<TimesheetDto>(
+      'findWorkforceUserTimesheet',
+      { id, month },
+    );
+  }
   findOne(id: number): Observable<WorkforceUserResponseDto> {
     return this.workforceClient.send('findOneWorkforceUser', id);
   }
