@@ -1,3 +1,7 @@
+import {
+  RotationPlanDto,
+  RotationPlanResponseDto,
+} from '../shifts/dto/rotation-plan.dto.js';
 import { WorkRuleErrorDto } from '../shifts/dto/work-rule-error.dto.js';
 import { ApiExtraModels, getSchemaPath } from '@nestjs/swagger';
 import { CreateTeamShiftsDto } from '../shifts/dto/create-team-shifts.dto.js';
@@ -150,6 +154,27 @@ export class TeamsController {
     return this.teamsService.remove(id).pipe(map(() => undefined));
   }
 
+  @Post(':id/rotation-plan')
+  @HttpCode(200)
+  @Roles(AccountRole.ADMIN, AccountRole.PLANNER)
+  @ApiOperation({
+    summary: 'Otomatik vardiya planı üretir veya uygular',
+    description:
+      'İzin verilen roller: ADMIN, PLANNER. apply=false önizleme kayıt yapmaz; true eksik planı 409 ile reddeder. Yanıt 200.',
+  })
+  @ApiOkResponse({ type: RotationPlanResponseDto })
+  @ApiBadRequestResponse({
+    description: 'Geçersiz tarih, kalıp veya kişi sayısı',
+  })
+  @ApiConflictResponse({
+    description: 'Plan tamamlanamadı, pasif ekip veya geçmişe atama',
+  })
+  rotation(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: RotationPlanDto,
+  ) {
+    return this.teamsService.rotation(id, dto);
+  }
   @Post(':id/shifts')
   @Roles(AccountRole.ADMIN, AccountRole.PLANNER)
   @ApiOperation({

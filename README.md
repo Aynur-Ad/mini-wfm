@@ -658,3 +658,11 @@ GET `/api/workforce-users/:id/timesheet?month=2026-11` üç role açıktır. 202
 Üretim `shifts/calc/timesheet.ts` sınır bölme algoritmasını kullanır. Dakika referansı yalnız `src/test/timesheet.reference.ts` içindedir ve üretim build'ine dahil değildir. 200 sabit seed'li ayda sonuçlar karşılaştırılır. Ölçüm: `pnpm --dir workforce-service exec node --import tsx scripts/benchmark-timesheet.ts`. 1000 personel × 22 vardiya × bir ay ölçümünde bu ortamda referans 7171.07 ms, bölme 111.65 ms; donanım/yük sonucu etkiler.
 
 Tatil kaynakları: [Borsa İstanbul 2026](https://www.borsaistanbul.com/resmi-tatil-gunleri), [Diyanet](https://diyanet.gov.tr/dini-gun-geceler), [DHMİ 2027](https://dhmi.gov.tr/AIPDocuments/LT_GEN_2_1_en.pdf). İdari izinler resmi tatil sayılmaz; 2027-05-19 bir kez sayılır.
+
+### Otomatik rotasyon
+
+POST `/api/teams/:id/rotation-plan` ADMIN/PLANNER için 200 yanıtıyla plan döndürür. Gövde `startDate` (yerel YYYY-MM-DD), `days` (1–14), `slots: [{ name, startTime, endTime, requiredCount }]` ve `apply` (varsayılan false) alır. Bitişte 24:00 desteklenir; gece yarısını aşan kalıp ertesi gün biter. Süre 1–12 saat olmalıdır; kalıp adları benzersizdir.
+
+Algoritma günleri ve gün içi kalıpları başlangıca göre dolaşır. Aktif üyelerde çakışma ve çalışma kuralları kontrol edilir. Adaylar yalnız plana eklenen dakika, eşitlikte sicil ve ID ile sıralanır. Yanıtta assignments, tüm üyeler için totals (dakika/saat), unfilled ve fairnessHours vardır. Bu greedy yöntem küresel optimum vaat etmez. Kalıpları yanlışlıkla Sabah/Akşam/Gece dolaşmak 4 veya 5 üyede yedinci Gece'yi boş bırakabilir; testte sıralama kapalı karşılaştırma bulunur.
+
+Önizleme yazmaz. apply=true eksik planda `409 Plan tamamlanamadı` ve unfilled detayları verir. Tam planda ekip/personel kilitleri, mevcut vardiya okuması, hesap ve toplu save tek transaction'dadır. Başlangıcı geçmiş atama kaydedilmez; önizleme geçmiş tarih için de hesap yapabilir. Aynı planın tekrar uygulanması mevcut vardiyalarla değerlendirilir; eksik plan oluşursa 409 olur.
