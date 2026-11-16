@@ -34,6 +34,13 @@ const allRoles = Object.values(AccountRole);
 const adminOnly = [AccountRole.ADMIN];
 const routes = [
   {
+    method: 'get',
+    path: '/work-orders/1/team-suggestions',
+    pattern: 'findWorkOrderTeamSuggestions',
+    roles: allRoles,
+    status: 200,
+  },
+  {
     method: 'post',
     path: '/teams/1/rotation-plan',
     pattern: 'createTeamRotationPlan',

@@ -666,3 +666,11 @@ POST `/api/teams/:id/rotation-plan` ADMIN/PLANNER için 200 yanıtıyla plan dö
 Algoritma günleri ve gün içi kalıpları başlangıca göre dolaşır. Aktif üyelerde çakışma ve çalışma kuralları kontrol edilir. Adaylar yalnız plana eklenen dakika, eşitlikte sicil ve ID ile sıralanır. Yanıtta assignments, tüm üyeler için totals (dakika/saat), unfilled ve fairnessHours vardır. Bu greedy yöntem küresel optimum vaat etmez. Kalıpları yanlışlıkla Sabah/Akşam/Gece dolaşmak 4 veya 5 üyede yedinci Gece'yi boş bırakabilir; testte sıralama kapalı karşılaştırma bulunur.
 
 Önizleme yazmaz. apply=true eksik planda `409 Plan tamamlanamadı` ve unfilled detayları verir. Tam planda ekip/personel kilitleri, mevcut vardiya okuması, hesap ve toplu save tek transaction'dadır. Başlangıcı geçmiş atama kaydedilmez; önizleme geçmiş tarih için de hesap yapabilir. Aynı planın tekrar uygulanması mevcut vardiyalarla değerlendirilir; eksik plan oluşursa 409 olur.
+
+### İş emri için ekip önerisi
+
+GET `/api/work-orders/:id/team-suggestions` üç role açıktır; yalnız OPEN durumda çalışır (aksi 409). Şimdi ile dueAt arasındaki aktif üye vardiya saatleri kapasitedir. Puan = kapasite × 2 − açık iş sayısı × 5 − geciken açık iş sayısı × 10. URGENT için kapasite katsayısı 4 olur. Açık yük yalnız ASSIGNED/IN_PROGRESS sayar. Tek ağırlık nesnesi `work-orders/calc/team-score.ts` içindedir.
+
+Aktif ama kapasitesiz ekip excluded/NO_CAPACITY listesine gider. Diğerlerinden puan azalan, açık yük artan, ad ve ID artan sıralamayla ilk üç döner. Her önerinin breakdown puanları toplamı score değeridir. DueAt geçmişse değerlendirme kapasitesi sıfırdır. Pasif ekip/üye sayılmaz.
+
+Servis hedef iş emri, aktif ekip+üyeler (LEFT JOIN), ilgili vardiyalar ve açık yükü en fazla dört SELECT ile okur. Saf fonksiyon personel-ekip ve ekip-metrik Map'leri kurar, vardiyaları/işleri birer kez dolaşır: O(T + M + S + W + T log T). Ekip başına bütün vardiyaları tekrar taramak O(T × S) olurdu. 50 ekip/1000 personel/10000 vardiya için 50 ms sınırını test eder; ayrı ölçüm `pnpm --dir workforce-service exec node --import tsx scripts/benchmark-team-score.ts`. Öneri bir atama garantisi veya çalışma kuralı kontrolü değildir; karar destek puanıdır.
