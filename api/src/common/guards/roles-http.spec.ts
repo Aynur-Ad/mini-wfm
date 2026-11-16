@@ -34,6 +34,26 @@ const allRoles = Object.values(AccountRole);
 const adminOnly = [AccountRole.ADMIN];
 const routes = [
   {
+    method: 'post',
+    path: '/teams/1/rotation-plan',
+    pattern: 'createTeamRotationPlan',
+    roles: [AccountRole.ADMIN, AccountRole.PLANNER],
+    status: 200,
+    body: {
+      startDate: '2035-01-01',
+      days: 1,
+      slots: [
+        {
+          name: 'Sabah',
+          startTime: '08:00',
+          endTime: '16:00',
+          requiredCount: 1,
+        },
+      ],
+      apply: false,
+    },
+  },
+  {
     method: 'get',
     path: '/workforce-users/1/timesheet',
     pattern: 'findWorkforceUserTimesheet',

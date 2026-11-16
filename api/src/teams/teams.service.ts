@@ -1,3 +1,7 @@
+import type {
+  RotationPlanDto,
+  RotationPlanResponseDto,
+} from '../shifts/dto/rotation-plan.dto.js';
 import type { CreateTeamShiftsDto } from '../shifts/dto/create-team-shifts.dto.js';
 import type { ShiftResponseDto } from '../shifts/dto/shift-response.dto.js';
 import { Inject, Injectable } from '@nestjs/common';
@@ -15,6 +19,12 @@ export class TeamsService {
     private readonly workforceClient: WorkforceClient,
   ) {}
 
+  rotation(teamId: number, dto: RotationPlanDto) {
+    return this.workforceClient.send<RotationPlanResponseDto>(
+      'createTeamRotationPlan',
+      Object.assign({}, dto, { teamId }),
+    );
+  }
   create(dto: CreateTeamDto): Observable<unknown> {
     return this.workforceClient.send('createTeam', dto);
   }
