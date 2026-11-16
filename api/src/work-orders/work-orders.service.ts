@@ -1,3 +1,4 @@
+import type { TeamSuggestionsDto } from './dto/team-suggestions.dto.js';
 import type { QueryWorkOrdersDto } from './dto/query-work-orders.dto.js';
 import type { WorkOrderListDto } from './dto/work-order-list.dto.js';
 import { ForbiddenException } from '@nestjs/common';
@@ -22,6 +23,12 @@ export class WorkOrdersService {
   }
   findAll(dto: QueryWorkOrdersDto) {
     return this.client.send<WorkOrderListDto>('findAllWorkOrders', dto);
+  }
+  suggestions(id: number) {
+    return this.client.send<TeamSuggestionsDto>(
+      'findWorkOrderTeamSuggestions',
+      id,
+    );
   }
   findOne(id: number) {
     return this.client.send<WorkOrderResponseDto>('findOneWorkOrder', id);

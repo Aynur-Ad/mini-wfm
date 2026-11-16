@@ -1,3 +1,4 @@
+import { TeamSuggestionsDto } from './dto/team-suggestions.dto.js';
 import { QueryWorkOrdersDto } from './dto/query-work-orders.dto.js';
 import { WorkOrderListDto } from './dto/work-order-list.dto.js';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
@@ -110,6 +111,18 @@ export class WorkOrdersController {
     return this.orders.changeStatus(id, dto, user);
   }
 
+  @Get(':id/team-suggestions')
+  @Roles(AccountRole.ADMIN, AccountRole.PLANNER, AccountRole.VIEWER)
+  @ApiOperation({
+    summary: 'Açık iş emri için ilk üç ekip önerisi',
+    description:
+      'İzin verilen roller: ADMIN, PLANNER, VIEWER. Kapasite şimdi-dueAt arasıdır; puan ve ölçüt dökümü döner.',
+  })
+  @ApiOkResponse({ type: TeamSuggestionsDto })
+  @ApiConflictResponse({ description: 'Yalnız OPEN durumunda öneri yapılır' })
+  suggestions(@Param('id', ParseIntPipe) id: number) {
+    return this.orders.suggestions(id);
+  }
   @Get(':id/history')
   @Roles(AccountRole.ADMIN, AccountRole.PLANNER, AccountRole.VIEWER)
   @ApiOperation({
