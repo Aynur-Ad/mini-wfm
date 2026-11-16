@@ -1,3 +1,7 @@
+import {
+  DEFAULT_WORK_RULE_OPTIONS,
+  WORK_RULE_OPTIONS,
+} from '../config/work-rules.config.js';
 import type { CreateShiftDto } from './dto/create-shift.dto.js';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -35,6 +39,7 @@ describe('ShiftsService', () => {
   let current: Shift;
   const people = { findOne: vi.fn() };
   const repository = {
+    find: vi.fn(),
     findOne: vi.fn(),
     findOneBy: vi.fn(),
     create: vi.fn(),
@@ -58,6 +63,7 @@ describe('ShiftsService', () => {
             entity === WorkforceUser ? people : repository,
         }),
     );
+    repository.find.mockResolvedValue([]);
     people.findOne.mockResolvedValue({ id: 1, isActive: true });
     repository.findOneBy.mockResolvedValue(current);
     repository.findOne.mockImplementation(({ lock }: { lock?: unknown }) =>
@@ -70,6 +76,7 @@ describe('ShiftsService', () => {
     const module = await Test.createTestingModule({
       providers: [
         ShiftsService,
+        { provide: WORK_RULE_OPTIONS, useValue: DEFAULT_WORK_RULE_OPTIONS },
         { provide: getRepositoryToken(Shift), useValue: repository },
       ],
     }).compile();
@@ -281,6 +288,42 @@ describe('ShiftsService', () => {
       },
     });
     expect(repository.remove).not.toHaveBeenCalled();
+  });
+  it('6 saat dinlenmede 409 details döner, save çalışmaz; sorgu ±7 günle sınırlıdır', async () => {
+    repository.find.mockResolvedValue([
+      {
+        id: 1,
+        workforceUserId: 1,
+        startAt: new Date('2099-01-01T15:00:00Z'),
+        endAt: new Date('2099-01-01T23:00:00Z'),
+      },
+    ]);
+    await expect(create()).rejects.toMatchObject({
+      error: {
+        statusCode: 409,
+        details: [
+          expect.objectContaining({
+            code: 'REST',
+            workforceUserId: 1,
+            value: 6,
+            actualMinutes: 360,
+            message: expect.stringContaining('6 saat'),
+          }),
+        ],
+      },
+    });
+    expect(repository.save).not.toHaveBeenCalled();
+    const where = repository.find.mock.calls[0][0].where;
+    expect(where.startAt).toEqual(
+      LessThan(new Date(new Date(dto.endAt).getTime() + 7 * 86400000)),
+    );
+    expect(where.endAt).toEqual(
+      MoreThan(new Date(new Date(dto.startAt).getTime() - 7 * 86400000)),
+    );
+  });
+  it('PATCH eski IDyi çalışma kuralları sorgusundan da dışlar', async () => {
+    await service.update(10, { id: 10, note: 'Yeni' });
+    expect(repository.find.mock.calls[0][0].where.id).toEqual(Not(10));
   });
   it('beklenmeyen DB hatasını iş kuralı hatası olarak gizlemez', async () => {
     const error = new Error('connection lost');

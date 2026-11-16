@@ -609,6 +609,43 @@ describe('HTTP rol izinleri — gerçek global guard ve controller akışı', ()
     expect(result.body).toEqual(error);
   });
 
+  it.each(['/api/shifts', '/api/shifts/1', '/api/teams/1/shifts'])(
+    'çalışma kuralı details HTTP yanıtında kayıpsız kalır: %s',
+    async (path) => {
+      const error = {
+        statusCode: 409,
+        message: 'Vardiya çalışma kurallarına uymuyor',
+        details: [
+          {
+            code: 'REST',
+            workforceUserId: 1,
+            value: 6,
+            limit: 11,
+            unit: 'hours',
+            actualMinutes: 360,
+            limitMinutes: 660,
+            shifts: [],
+            message: 'Dinlenme süresi 6 saat; en az 11 saat olmalıdır',
+          },
+        ],
+      };
+      send.mockReturnValue(throwError(() => error));
+      const result = await call(
+        app,
+        path === '/api/shifts/1' ? 'patch' : 'post',
+        path,
+      )
+        .set('Authorization', `Bearer ${tokens.get(AccountRole.PLANNER)}`)
+        .send({
+          workforceUserId: 1,
+          startAt: '2099-01-02T08:00:00+03:00',
+          endAt: '2099-01-02T16:00:00+03:00',
+        });
+      expect(result.status).toBe(409);
+      expect(result.body).toEqual(error);
+    },
+  );
+
   it('toplu atamada üye/actor bilgisi bodyden alınmaz; teamId URLden gelir', async () => {
     send.mockReturnValue(of([]));
     const result = await request(app.getHttpServer())

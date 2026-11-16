@@ -1,3 +1,4 @@
+import { WorkRuleErrorDto } from './dto/work-rule-error.dto.js';
 import { QueryShiftsDto } from './dto/query-shifts.dto.js';
 import { ShiftListItemDto } from './dto/shift-list-item.dto.js';
 import {
@@ -56,8 +57,9 @@ export class ShiftsController {
   })
   @ApiCreatedResponse({ type: ShiftResponseDto })
   @ApiConflictResponse({
+    type: WorkRuleErrorDto,
     description:
-      'Geçmiş tarih, pasif personel veya çakışan vardiya; çakışan saatler mesajda yer alır',
+      'Geçmiş tarih, pasif personel, çakışma veya REST/WEEKLY_LIMIT/CONSECUTIVE_DAYS ihlali; çalışma kuralı ihlalleri details içinde döner',
   })
   create(@Body() dto: CreateShiftDto) {
     return this.shifts.create(dto);
@@ -105,8 +107,9 @@ export class ShiftsController {
   })
   @ApiOkResponse({ type: ShiftResponseDto })
   @ApiConflictResponse({
+    type: WorkRuleErrorDto,
     description:
-      'Başlamış vardiya, geçmiş yeni tarih, pasif personel veya çakışma',
+      'Başlamış vardiya, geçmiş yeni tarih, pasif personel, çakışma veya details içinde çalışma kuralı ihlali',
   })
   update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateShiftDto) {
     return this.shifts.update(id, dto);
