@@ -1,3 +1,6 @@
+import { randomUUID } from 'node:crypto';
+import { WorkOrderEventsPublisher } from './events/work-order-events.publisher.js';
+import type { WorkOrderEvent } from './events/work-order-events.js';
 import type { QueryWorkOrdersDto } from './dto/query-work-orders.dto.js';
 import { WorkOrderStatusHistory } from './entities/work-order-status-history.entity.js';
 import {
@@ -25,6 +28,7 @@ function fail(statusCode: number, message: string): never {
 export class WorkOrdersService {
   constructor(
     @InjectRepository(WorkOrder) private readonly orders: Repository<WorkOrder>,
+    private readonly events?: WorkOrderEventsPublisher,
   ) {}
 
   async create(dto: CreateWorkOrderDto): Promise<WorkOrder> {
@@ -221,7 +225,9 @@ export class WorkOrdersService {
   ): Promise<WorkOrder> {
     const actor = requestContext.getStore()?.actor;
     if (!actor) fail(401, 'İşlemi yapan kullanıcı bilgisi eksik');
-    return this.orders.manager.transaction(async (manager) => {
+    const correlationId =
+      requestContext.getStore()?.correlationId ?? randomUUID();
+    const result = await this.orders.manager.transaction(async (manager) => {
       const repository = manager.getRepository(WorkOrder);
       const order = await repository.findOne({ where: { id } });
       if (!order) fail(404, 'İş emri bulunamadı');
@@ -239,6 +245,7 @@ export class WorkOrdersService {
       if (reason && Array.from(reason).length > 500)
         fail(400, 'Neden en fazla 500 karakter olabilir');
       let teamId = order.teamId;
+      let workforceUserIds: number[] = [];
       if (rule.teamAction === 'assign') {
         if (!Number.isInteger(dto.teamId) || !dto.teamId || dto.teamId < 1)
           fail(400, 'Atamada geçerli ekip ID zorunludur');
@@ -259,6 +266,7 @@ export class WorkOrdersService {
           .getMany();
         if (active.length === 0) fail(409, 'Ekibin aktif üyesi bulunmuyor');
         teamId = team.id;
+        workforceUserIds = active.map((person) => person.id);
       } else if (rule.teamAction === 'clear') teamId = null;
       const fromStatus = order.status;
       const saved = await this.updateIfVersionMatches(
@@ -279,8 +287,32 @@ export class WorkOrdersService {
           changedById: actor.id,
         }),
       );
-      return saved;
+      return { saved, fromStatus, workforceUserIds };
     });
+    // Buraya sadece COMMIT başarıyla tamamlandıysa ulaşılır (B22).
+    const event: WorkOrderEvent = {
+      eventId: randomUUID(),
+      correlationId,
+      workOrderId: result.saved.id,
+      workOrderCode: result.saved.code,
+      teamId: result.saved.teamId,
+      occurredAt: new Date().toISOString(),
+      fromStatus: result.fromStatus,
+      toStatus: result.saved.status,
+      workforceUserIds: result.workforceUserIds,
+    };
+    if (this.events) {
+      const pending = [this.events.publish('workOrderStatusChanged', event)];
+      if (result.saved.status === WorkOrderStatus.ASSIGNED)
+        pending.push(
+          this.events.publish('workOrderAssigned', {
+            ...event,
+            eventId: randomUUID(),
+          }),
+        );
+      await Promise.all(pending);
+    }
+    return result.saved;
   }
 
   async findHistory(id: number) {

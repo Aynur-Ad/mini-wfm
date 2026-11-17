@@ -39,6 +39,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 
     // workforce-service ulaşılamaz durumda mı? (ECONNREFUSED)
     if (
+      err?.name === 'TimeoutError' ||
       err?.code === 'ECONNREFUSED' ||
       err?.code === 'ECONNRESET' ||
       err?.code === 'EPIPE' ||

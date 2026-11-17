@@ -1,5 +1,6 @@
 import type { Repository } from 'typeorm';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { WorkOrderEventsPublisher } from './events/work-order-events.publisher.js';
 import { WorkOrdersService } from './work-orders.service.js';
 import { WorkOrder } from './entities/work-order.entity.js';
 import { WorkOrderStatusHistory } from './entities/work-order-status-history.entity.js';
@@ -29,6 +30,7 @@ describe('İş emri durum/geçmiş service', () => {
   let service: WorkOrdersService;
   let current: WorkOrder;
   let changes: Record<string, unknown>;
+  const events = { publish: vi.fn() };
   const mutation = {
     update: vi.fn(),
     set: vi.fn(),
@@ -127,7 +129,10 @@ describe('İş emri durum/geçmiş service', () => {
     ] as const)
       members[key].mockReturnValue(members);
     members.getMany.mockResolvedValue([{ id: 9 }]);
-    service = new WorkOrdersService(orders as unknown as Repository<WorkOrder>);
+    service = new WorkOrdersService(
+      orders as unknown as Repository<WorkOrder>,
+      events as unknown as WorkOrderEventsPublisher,
+    );
   });
   it.each(allowed)(
     '%s → %s izinlidir ve tek transactionda geçmiş yazar',
@@ -272,5 +277,52 @@ describe('İş emri durum/geçmiş service', () => {
     });
     expect(mutation.execute).not.toHaveBeenCalled();
     expect(history.save).not.toHaveBeenCalled();
+  });
+  it('COMMIT sonrasında iki farklı eventId ile durum ve atama olaylarını yayınlar', async () => {
+    current.code = 'IE-2026-00001';
+    await change(S.ASSIGNED);
+    expect(events.publish).toHaveBeenCalledTimes(2);
+    const [statusType, statusEvent] = events.publish.mock.calls[0];
+    const [assignedType, assignedEvent] = events.publish.mock.calls[1];
+    expect(statusType).toBe('workOrderStatusChanged');
+    expect(assignedType).toBe('workOrderAssigned');
+    expect(statusEvent.correlationId).toBe('status-test');
+    expect(assignedEvent.workforceUserIds).toEqual([9]);
+    expect(statusEvent.eventId).not.toBe(assignedEvent.eventId);
+  });
+  it('transaction geri alınırsa olay gönderilmez', async () => {
+    history.save.mockRejectedValue(new Error('rollback'));
+    await expect(change(S.ASSIGNED)).rejects.toThrow('rollback');
+    expect(events.publish).not.toHaveBeenCalled();
+  });
+  it('COMMIT başarısızsa olay gönderilmez', async () => {
+    const implementation = orders.manager.transaction.getMockImplementation()!;
+    orders.manager.transaction.mockImplementation(
+      async (...args: unknown[]) => {
+        await (implementation as (...args: unknown[]) => unknown)(...args);
+        throw new Error('commit failed');
+      },
+    );
+    await expect(change(S.ASSIGNED)).rejects.toThrow('commit failed');
+    expect(events.publish).not.toHaveBeenCalled();
+  });
+  it('yayın çağrısı transaction başarıyla çözülmeden başlamaz', async () => {
+    let committed = false;
+    const implementation = orders.manager.transaction.getMockImplementation()!;
+    orders.manager.transaction.mockImplementation(
+      async (...args: unknown[]) => {
+        const result = await (
+          implementation as (...args: unknown[]) => unknown
+        )(...args);
+        expect(events.publish).not.toHaveBeenCalled();
+        committed = true;
+        return result;
+      },
+    );
+    events.publish.mockImplementation(async () => {
+      expect(committed).toBe(true);
+    });
+    await change(S.ASSIGNED);
+    expect(events.publish).toHaveBeenCalledTimes(2);
   });
 });

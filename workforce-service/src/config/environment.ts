@@ -10,6 +10,9 @@ export interface Environment {
   MAX_CONSECUTIVE_DAYS: number;
   INITIAL_ADMIN_USERNAME: string;
   INITIAL_ADMIN_PASSWORD: string;
+  RABBITMQ_URL: string;
+  RABBITMQ_QUEUE: string;
+  EVENT_PUBLISH_TIMEOUT_MS: number;
   WORKFORCE_HOST: string;
   WORKFORCE_PORT: number;
   DB_HOST: string;
@@ -54,6 +57,17 @@ const schema: Record<keyof Environment, Setting> = {
   },
   INITIAL_ADMIN_USERNAME: { type: 'string', default: 'admin' },
   INITIAL_ADMIN_PASSWORD: { type: 'string' },
+  RABBITMQ_URL: {
+    type: 'string',
+    default: 'amqp://mini_wfm:local_dev_only@127.0.0.1:5672',
+  },
+  RABBITMQ_QUEUE: { type: 'string', default: 'work_order_events' },
+  EVENT_PUBLISH_TIMEOUT_MS: {
+    type: 'integer',
+    default: 1500,
+    min: 100,
+    max: 10000,
+  },
   WORKFORCE_HOST: { type: 'string', default: '127.0.0.1' },
   WORKFORCE_PORT: { type: 'port', default: 4001 },
   DB_HOST: { type: 'string' },
@@ -134,6 +148,20 @@ export function validateEnvironment(
     );
   }
 
+  if (typeof result.RABBITMQ_URL === 'string') {
+    try {
+      const url = new URL(result.RABBITMQ_URL);
+      if (!['amqp:', 'amqps:'].includes(url.protocol) || !url.hostname)
+        throw new Error();
+    } catch {
+      errors.push('RABBITMQ_URL: geçerli amqp/amqps adresi olmalı.');
+    }
+  }
+  if (
+    typeof result.RABBITMQ_QUEUE === 'string' &&
+    !/^[A-Za-z0-9._-]{1,100}$/.test(result.RABBITMQ_QUEUE)
+  )
+    errors.push('RABBITMQ_QUEUE: geçersiz kuyruk adı.');
   if (errors.length > 0) {
     // Değerleri yazdırma: hata mesajında şifreler görünmemeli.
     throw new Error(`Ortam ayarları geçersiz:\n${errors.join('\n')}`);
