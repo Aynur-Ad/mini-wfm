@@ -1,3 +1,5 @@
+import { NotificationsController } from './notifications/notifications.controller.js';
+import { NotificationsService } from './notifications/notifications.service.js';
 import { WorkOrdersController } from './work-orders/work-orders.controller.js';
 import { WorkOrdersService } from './work-orders/work-orders.service.js';
 import { ShiftsController } from './shifts/shifts.controller.js';
@@ -50,6 +52,17 @@ import { WorkforceUsersController } from './workforce_users/workforce_users.cont
     }),
     ClientsModule.registerAsync([
       {
+        name: 'NOTIFICATION_TCP',
+        inject: [ConfigService],
+        useFactory: (config: ConfigService<Environment, true>) => ({
+          transport: Transport.TCP,
+          options: {
+            host: config.get('NOTIFICATION_HOST', { infer: true }),
+            port: config.get('NOTIFICATION_PORT', { infer: true }),
+          },
+        }),
+      },
+      {
         name: 'WORKFORCE_TCP',
         inject: [ConfigService],
         useFactory: (config: ConfigService<Environment, true>) => ({
@@ -63,6 +76,7 @@ import { WorkforceUsersController } from './workforce_users/workforce_users.cont
     ]),
   ],
   controllers: [
+    NotificationsController,
     WorkOrdersController,
     ShiftsController,
     AuthController,
@@ -72,6 +86,7 @@ import { WorkforceUsersController } from './workforce_users/workforce_users.cont
     AccountsController,
   ], // gelen http isteklerini karşılayıp yanıt dönecek denetleyicileri kaydeder.
   providers: [
+    NotificationsService,
     WorkOrdersService,
     ShiftsService,
     AuthService,

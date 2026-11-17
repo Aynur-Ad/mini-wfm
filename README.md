@@ -674,3 +674,160 @@ GET `/api/work-orders/:id/team-suggestions` üç role açıktır; yalnız OPEN d
 Aktif ama kapasitesiz ekip excluded/NO_CAPACITY listesine gider. Diğerlerinden puan azalan, açık yük artan, ad ve ID artan sıralamayla ilk üç döner. Her önerinin breakdown puanları toplamı score değeridir. DueAt geçmişse değerlendirme kapasitesi sıfırdır. Pasif ekip/üye sayılmaz.
 
 Servis hedef iş emri, aktif ekip+üyeler (LEFT JOIN), ilgili vardiyalar ve açık yükü en fazla dört SELECT ile okur. Saf fonksiyon personel-ekip ve ekip-metrik Map'leri kurar, vardiyaları/işleri birer kez dolaşır: O(T + M + S + W + T log T). Ekip başına bütün vardiyaları tekrar taramak O(T × S) olurdu. 50 ekip/1000 personel/10000 vardiya için 50 ms sınırını test eder; ayrı ölçüm `pnpm --dir workforce-service exec node --import tsx scripts/benchmark-team-score.ts`. Öneri bir atama garantisi veya çalışma kuralı kontrolü değildir; karar destek puanıdır.
+
+
+## MWFM-39 — Mevcut çalışmaya uygulanan düzeltmeler
+
+Bu bölüm, 17 Kasım'da gönderilen `chat(1).zip` içindeki kod esas alınarak hazırlanmıştır. Önceki ZIP ile karıştırmayın. `work_order_events` kuyruğu, `local_dev_only` yerel RabbitMQ şifresi, `findNotifications` TCP mesaj adı ve mevcut NotificationsModule yapısı korundu.
+
+### Uygulama sırası (PowerShell, proje kökü)
+
+1. Bu düzeltme ZIP'inin içeriğini doğrudan proje köküne kopyalayın ve aynı adlı dosyaları değiştirin. ZIP'te gerçek `.env`, `node_modules` veya veritabanı verisi yoktur.
+2. Aşağıdaki üç dosya, gönderilen ZIP'te kökteki dosyalarla birebir aynıydı. Bunlar yanlışlıkla `test` klasörlerine kopyalanmış; asıl dosyalar yerinde duruyor. Yalnız bu üç kopyayı kaldırın:
+
+```powershell
+Remove-Item -LiteralPath "api/test/.env.example", "workforce-service/test/.env.example", "workforce-service/test/package.json"
+```
+
+`test` klasörlerini veya diğer test dosyalarını silmeyin. Kök `pnpm-lock.yaml` bu düzeltmede değiştirilmedi; uygulamaların bağımlılıklarını kendi klasörlerinden kurun.
+
+3. Bağımlılıkları kurun:
+
+```powershell
+pnpm --dir api install --frozen-lockfile
+pnpm --dir workforce-service install --frozen-lockfile
+pnpm --dir notification-service install --frozen-lockfile
+```
+
+Yeni notification-service kilit dosyası ve `pnpm-workspace.yaml`, kurulumun tekrarlanabilir olması ve gerekli esbuild kurulum betiğinin çalışması için eklendi. Testcontainers'ın bu projede kullanılmayan SSH/Protobuf yardımcı derlemeleri açıkça kapatıldı.
+
+4. Gerçek `.env` dosyalarınızı koruyun. Notification-service için henüz `.env` yoksa `.env.example` dosyasını kopyalayın ve `DB_PASSWORD` değerini mevcut PostgreSQL şifrenizle doldurun. API ve workforce-service'in `.env` dosyalarını yeniden kopyalayarak üzerlerine yazmayın.
+
+Kontrol edilecek değerler:
+
+| Uygulama | Değerler |
+| --- | --- |
+| api | `NOTIFICATION_HOST=127.0.0.1`, `NOTIFICATION_PORT=4002` |
+| workforce-service | `RABBITMQ_URL=amqp://mini_wfm:local_dev_only@127.0.0.1:5672`, `RABBITMQ_QUEUE=work_order_events`, `EVENT_PUBLISH_TIMEOUT_MS=1500` |
+| notification-service | Aynı `RABBITMQ_URL` ve `RABBITMQ_QUEUE`; `NOTIFICATION_HOST=127.0.0.1`, `NOTIFICATION_PORT=4002`; mevcut PostgreSQL bağlantısı |
+
+Kuyruk ve timeout için kodda yukarıdaki varsayılanlar vardır. RabbitMQ şifresini kendiniz değiştirdiyseniz URL'lerde kendi değerinizi kullanın. İki servisin kuyruk adı aynı olmalıdır.
+
+5. Docker Desktop açıkken altyapıyı başlatın; ardından üç backend uygulamasını ayrı terminallerde çalıştırın:
+
+```powershell
+docker compose up -d
+```
+
+Ayrı terminaller:
+
+```powershell
+pnpm --dir workforce-service start:dev
+```
+
+```powershell
+pnpm --dir notification-service start:dev
+```
+
+```powershell
+pnpm --dir api start:dev
+```
+
+Açık eski süreçler varsa önce durdurup yeniden başlatın. Notification-service HTTP açmaz; RabbitMQ'dan olay, TCP 4002'den okuma isteği alır.
+
+### Neyi, neden düzelttim?
+
+| Dosya/klasör | Değişiklik ve nedeni |
+| --- | --- |
+| `workforce-service/src/work-orders/events/work-order-events.publisher.ts` | Sınırsız açık kalan subscribe yerine süre sınırlı yayın ve her deneme sonunda kapanan istemci var. Broker onayı beklenir, tüketicinin işi bitirmesi beklenmez. Hata atamayı bozmaz; ham bağlantı hataları/şifreler loglanmaz. |
+| `workforce-service/src/work-orders/work-orders.service.ts` | Senin COMMIT sonrası yayın akışın korundu. İki yayının en fazla ayardaki süre kadar beklenip temizlenmesi sağlandı. COMMIT hatasında yayın başlamıyor. |
+| `workforce-service/src/work-orders/work-orders.module.ts` | Yayıncı kendi kısa ömürlü istemcisini kullandığı için eski sürekli RMQ client kaydı çıkarıldı. |
+| `notification-service/src/notifications/notifications.controller.ts` | DB hatasında `nack(..., requeue=true)` var; mesaj açık kanal üzerinde yeniden denenebilir. Geçersiz mesajlar sonsuz kez denenmez. Başarılı COMMIT veya daha önce işlenmiş olay sonrasında ack yapılır. Event handler'ları yalnız RMQ, okuma handler'ı yalnız TCP için tanımlandı. |
+| `notification-service/src/notifications/notifications.service.ts` | İşlenmiş olay işaretçisi ve tüm alıcıların bildirimleri aynı transaction'da yazılıyor. Paralel aynı olaylar tekil işaretçi ile engelleniyor. Okuma P2 biçiminde sayfalı hale getirildi. |
+| `notification-service/src/common/logging/` | Mevcut projenin güvenli logger yaklaşımı bu servise de eklendi. Olay ve TCP okumasında correlation id bütün işlem boyunca korunuyor. |
+| `notification-service/src/config/`, `src/data-source.ts`, `src/migrations/` | Bildirim servisinin migration geçmişi `public.notification_migrations` olarak ayrıldı. Önceden oluşturulmuş bildirimler korunuyor; eski tablo güvenle tanınıyor, işlenmiş olaylar yeni tabloya aktarılıyor. Yanlışlıkla `public.migrations` içine yazılmış yalnız `CreateNotification1794800000000` kaydı kaldırılıyor; workforce migration kayıtları korunuyor. |
+| `notification-service/src/notifications/notification.entity.ts` | Entity'deki indeks tanımı, mevcut migration'daki personel+tarih indeksiyle eşleştirildi. |
+| `api/src/notifications/` | Pozitif personel ID doğrulaması, sayfalama, yanıt tipleri ve Swagger eklendi. Correlation id TCP zarfında taşınıyor. 3 saniyelik zaman aşımı HTTP 503 oluyor. API'deki mevcut ikinci TCP bağlantın korundu. |
+| Ayarlar, kilit dosyası ve testler | Kuyruk/timeout doğrulandı; tekrar teslim, ACK/NACK, COMMIT/rollback, eski veriyi koruyan migration geçişi ve gerçek TCP testi eklendi. |
+
+`eventId` kaynak olayda `processed_event` tablosunun birincil anahtarıyla tekildir. Bir kaynak olay birden fazla üyeye bildirim oluşturduğu için, bildirim tablosundaki mevcut `(event_id, workforce_user_id)` tekil kuralın korundu. Böylece her üye bir bildirim alır ve tekrar teslim yeni kayıt oluşturmaz.
+
+İlk notification migration'ında yalnız `IF NOT EXISTS` eklenmesi, daha önce başlatılmış bu proje kopyasının tabloyu silmeden ayrı migration geçmişine geçebilmesi içindir. Yeni işlenen olay tablosu ayrı migration'dadır. Manuel tablo/volume silme gerekmiyor.
+
+### Kontroller
+
+Hazırlama ortamında 944 test geçti: API 574, workforce-service 349, notification-service 21. Üç uygulamanın build ve lint kontrolleri geçti. Kapalı AMQP portuyla zaman aşımı ve gerçek TCP okuması da test edildi. PostgreSQL entegrasyon testleri eklendi fakat bu ortamda Docker/container runtime bulunmadığı için çalıştırılamadı.
+
+Kendi bilgisayarınızda:
+
+```powershell
+pnpm --dir api test
+pnpm --dir workforce-service test
+pnpm --dir notification-service test
+pnpm --dir api build
+pnpm --dir workforce-service build
+pnpm --dir notification-service build
+pnpm --dir api lint
+pnpm --dir workforce-service lint
+pnpm --dir notification-service lint
+```
+
+Docker Desktop açıkken:
+
+```powershell
+pnpm --dir workforce-service test:int
+pnpm --dir notification-service test:int
+```
+
+Bildirim entegrasyon testleri geçici PostgreSQL kullanır; geliştirme veritabanına bağlanmaz. Aynı olayın paralel gelmesi, transaction rollback, eski migration geçmişinden geçiş ve eski bildirimlerin korunması test edilir.
+
+Elle uçtan uca kontrol:
+
+1. Swagger'da giriş yapın; aktif ve en az iki aktif üyeli ekip hazırlayın.
+2. Notification-service'i durdurun. OPEN bir iş emrini bu ekibe atayın. RabbitMQ yönetim ekranında http://localhost:15672 adresinde `work_order_events` kuyruğundaki durum ve atama mesajlarını görün. Yerel kullanıcı `mini_wfm`, şifre `local_dev_only`.
+3. Notification-service'i başlatın; kuyruk işlenmeli. Her aktif üye için `GET /api/notifications?workforceUserId=<id>&page=1&limit=10` çağırın. Yanıt `{data,total,page,limit}` biçimindedir. Pasif üye için yeni bildirim oluşmaz.
+4. İsteğin correlation id değerini workforce-service ve notification-service loglarında takip edin.
+5. `docker compose stop rabbitmq` yapıp başka bir OPEN iş emrini atayın. Atama başarılı kalmalı; hata workforce-service loguna yazılmalı. Sonra `docker compose start rabbitmq` ile broker'ı açın.
+6. Yanlış version ile bir durum değişikliği isteyin. 409 dönmeli ve yeni olay/bildirim oluşmamalı.
+
+`send` + `@MessagePattern` yanıt beklenen TCP okumasıdır; `emit` + `@EventPattern` olmuş bir işin RabbitMQ üzerinden duyurulmasıdır. Tüketici kapalıyken broker'a ulaşan mesaj kalıcı kuyrukta bekler. B23 gereği broker'a ulaştırılamayan olay kaybolabilir; COMMIT ile yayın arasındaki süreç çökmesi de kayba yol açabilir. Outbox bu task'ın kapsamında değildir.
+
+### Branch, commit ve push
+
+Branch adı: `feature/MWFM-39-notification-service`. Zaten bu branch'teyseniz yeniden oluşturmayın. Değişiklikleriniz varken sırf branch açmak için `development` dalına geçmeniz gerekmez. Mevcut task-39 çalışmanızı yeni bir branch'e ayırmanız gerekiyorsa ve bu ad henüz yoksa:
+
+```powershell
+git switch -c feature/MWFM-39-notification-service
+```
+
+Dosyaları uygulayıp kontrolleri yaptıktan sonra:
+
+```powershell
+git status --short
+git add README.md docker-compose.yaml api workforce-service notification-service
+git commit -m "MWFM-39: RabbitMQ bildirim akışını tamamla"
+git push -u origin feature/MWFM-39-notification-service
+```
+
+PR hedefi proje planındaki `development` branch'i olsun.
+
+PR başlığı:
+
+```text
+MWFM-39: RabbitMQ ve notification-service ile atama bildirimleri
+```
+
+PR açıklaması:
+
+```text
+İş emri durum değişikliklerinin COMMIT sonrasında RabbitMQ üzerinden yayınlanması ve atanan ekibin aktif üyeleri için bildirim oluşturulması eklendi. Bildirimler API üzerinden notification-service'e yapılan TCP çağrısıyla okunuyor.
+
+- Kalıcı kuyruk, manuel ACK/NACK ve tekrar teslim koruması eklendi.
+- Broker hatasının iş emri atamasını bozmaması sağlandı.
+- Correlation id, ayar doğrulaması ve bağımsız migration geçmişi tamamlandı.
+- Yanlışlıkla test klasörlerine kopyalanmış üç ayar dosyası temizlendi.
+
+Doğrulama: Hazırlama ortamında 944 test ile üç uygulamanın build/lint kontrolleri geçti. Docker gerektiren entegrasyon testleri bu ortamda çalıştırılamadı; yerel sonuçlar ayrıca eklenmeli.
+
+B23 gereği broker'a ulaştırılamayan olay kaybolabilir; outbox kapsam dışıdır.
+```

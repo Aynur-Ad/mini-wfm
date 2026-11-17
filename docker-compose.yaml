@@ -13,5 +13,18 @@ services:
       - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: mini_wfm_rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: mini_wfm
+      RABBITMQ_DEFAULT_PASS: local_dev_only
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
 volumes:
+  rabbitmq_data:
   postgres_data:

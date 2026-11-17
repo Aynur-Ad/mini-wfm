@@ -1,6 +1,8 @@
 export interface Environment {
   JWT_SECRET: string;
   PORT: number;
+  NOTIFICATION_HOST: string;
+  NOTIFICATION_PORT: number;
   WORKFORCE_HOST: string;
   WORKFORCE_PORT: number;
 }
@@ -11,6 +13,8 @@ type Setting = { type: 'string' | 'port'; default?: string | number };
 const schema: Record<keyof Environment, Setting> = {
   JWT_SECRET: { type: 'string' },
   PORT: { type: 'port', default: 3000 },
+  NOTIFICATION_HOST: { type: 'string', default: '127.0.0.1' },
+  NOTIFICATION_PORT: { type: 'port', default: 4002 },
   WORKFORCE_HOST: { type: 'string', default: '127.0.0.1' },
   WORKFORCE_PORT: { type: 'port', default: 4001 },
 };
