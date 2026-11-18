@@ -1,6 +1,9 @@
 import type { WorkOrderEvent } from './work-order-event.js';
 export class InvalidEventError extends Error {}
-export function readEvent(value: unknown, assigned: boolean): WorkOrderEvent {
+export function readEvent(
+  value: unknown,
+  assigned: boolean | 'overdue',
+): WorkOrderEvent {
   const e = value as Partial<WorkOrderEvent> | null;
   const id = (v: unknown) =>
     typeof v === 'number' && Number.isInteger(v) && v > 0 && v <= 2147483647;
@@ -24,7 +27,10 @@ export function readEvent(value: unknown, assigned: boolean): WorkOrderEvent {
     !states.includes(e.toStatus ?? '') ||
     !Array.isArray(e.workforceUserIds) ||
     !e.workforceUserIds.every(id) ||
-    (assigned && (e.toStatus !== 'ASSIGNED' || !id(e.teamId)))
+    (assigned === true && (e.toStatus !== 'ASSIGNED' || !id(e.teamId))) ||
+    (assigned === 'overdue' &&
+      (e.fromStatus !== e.toStatus ||
+        ['COMPLETED', 'CANCELLED'].includes(e.toStatus ?? '')))
   )
     throw new InvalidEventError('Geçersiz iş emri olayı');
   return e as WorkOrderEvent;

@@ -25,13 +25,21 @@ export class NotificationsController {
   ) {}
   @EventPattern<string>('workOrderAssigned', Transport.RMQ)
   handleAssigned(@Payload() data: unknown, @Ctx() context: RmqContext) {
-    return this.consume(data, context, true);
+    return this.consume(data, context, 'assigned');
   }
   @EventPattern<string>('workOrderStatusChanged', Transport.RMQ)
   handleStatusChanged(@Payload() data: unknown, @Ctx() context: RmqContext) {
-    return this.consume(data, context, false);
+    return this.consume(data, context, 'status');
   }
-  private async consume(data: unknown, context: RmqContext, assigned: boolean) {
+  @EventPattern<string>('workOrderOverdue', Transport.RMQ)
+  handleOverdue(@Payload() data: unknown, @Ctx() context: RmqContext) {
+    return this.consume(data, context, 'overdue');
+  }
+  private async consume(
+    data: unknown,
+    context: RmqContext,
+    kind: 'assigned' | 'status' | 'overdue',
+  ) {
     const channel = context.getChannelRef() as Channel,
       message = context.getMessage() as ConsumeMessage;
     return requestContext.run(
@@ -42,13 +50,23 @@ export class NotificationsController {
       },
       async () => {
         try {
-          const event = readEvent(data, assigned);
-          if (assigned) await this.notifications.handleAssigned(event);
+          const event = readEvent(
+            data,
+            kind === 'overdue' ? 'overdue' : kind === 'assigned',
+          );
+          if (kind === 'assigned')
+            await this.notifications.handleAssigned(event);
+          if (kind === 'overdue') await this.notifications.handleOverdue(event);
           this.logger.log(
             JSON.stringify({
               eventId: event.eventId,
-              type: assigned ? 'workOrderAssigned' : 'workOrderStatusChanged',
-              phase: assigned ? 'stored' : 'received',
+              type:
+                kind === 'assigned'
+                  ? 'workOrderAssigned'
+                  : kind === 'overdue'
+                    ? 'workOrderOverdue'
+                    : 'workOrderStatusChanged',
+              phase: kind === 'status' ? 'received' : 'stored',
             }),
           );
         } catch (error) {

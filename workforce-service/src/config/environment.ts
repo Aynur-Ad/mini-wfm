@@ -1,9 +1,11 @@
+import { CronTime } from 'cron';
 import { DEFAULT_WORK_RULE_OPTIONS } from './work-rules.config.js';
 import {
   isValidPassword,
   normalizeUsername,
 } from '../accounts/password-policy.js';
 export interface Environment {
+  OVERDUE_CHECK_CRON: string;
   TIMEZONE_OFFSET_MINUTES: number;
   MIN_REST_HOURS: number;
   MAX_WEEKLY_HOURS: number;
@@ -31,6 +33,7 @@ type Setting = {
 
 // Her uygulama yalnızca kendi ihtiyaç duyduğu ayarları tanımlar.
 const schema: Record<keyof Environment, Setting> = {
+  OVERDUE_CHECK_CRON: { type: 'string', default: '0 */15 * * * *' },
   TIMEZONE_OFFSET_MINUTES: {
     type: 'integer',
     default: DEFAULT_WORK_RULE_OPTIONS.timezoneOffsetMinutes,
@@ -162,6 +165,13 @@ export function validateEnvironment(
     !/^[A-Za-z0-9._-]{1,100}$/.test(result.RABBITMQ_QUEUE)
   )
     errors.push('RABBITMQ_QUEUE: geçersiz kuyruk adı.');
+  if (typeof result.OVERDUE_CHECK_CRON === 'string') {
+    try {
+      new CronTime(result.OVERDUE_CHECK_CRON);
+    } catch {
+      errors.push('OVERDUE_CHECK_CRON: geçerli bir cron ifadesi olmalıdır.');
+    }
+  }
   if (errors.length > 0) {
     // Değerleri yazdırma: hata mesajında şifreler görünmemeli.
     throw new Error(`Ortam ayarları geçersiz:\n${errors.join('\n')}`);

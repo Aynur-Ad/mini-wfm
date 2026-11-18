@@ -204,12 +204,17 @@ export class WorkOrdersService {
       )
         fail(409, 'Kapanmış iş emri güncellenemez');
       const changes: Partial<
-        Pick<WorkOrder, 'title' | 'description' | 'priority' | 'dueAt'>
+        Pick<
+          WorkOrder,
+          'title' | 'description' | 'priority' | 'dueAt' | 'overdueNotifiedAt'
+        >
       > = {};
       if (dto.dueAt !== undefined) {
         const dueAt = new Date(dto.dueAt);
         this.checkDueAt(dueAt);
         changes.dueAt = dueAt;
+        if (dueAt.getTime() > order.dueAt.getTime())
+          changes.overdueNotifiedAt = null;
       }
       if (dto.title !== undefined) changes.title = dto.title;
       if (dto.description !== undefined) changes.description = dto.description;
@@ -365,7 +370,13 @@ export class WorkOrdersService {
     changes: Partial<
       Pick<
         WorkOrder,
-        'title' | 'description' | 'priority' | 'dueAt' | 'status' | 'teamId'
+        | 'title'
+        | 'description'
+        | 'priority'
+        | 'dueAt'
+        | 'status'
+        | 'teamId'
+        | 'overdueNotifiedAt'
       >
     >,
     expectedStatus?: WorkOrderStatus,

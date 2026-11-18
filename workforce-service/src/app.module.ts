@@ -1,3 +1,4 @@
+import { ScheduleModule } from '@nestjs/schedule';
 import { WorkOrdersModule } from './work-orders/work-orders.module.js';
 import { ShiftsModule } from './shifts/shifts.module.js';
 import { AccountsModule } from './accounts/accounts.module.js';
@@ -18,6 +19,7 @@ import { WorkforceUsersModule } from './workforce_users/workforce_users.module.j
       validate: validateEnvironment,
       skipProcessEnv: true,
     }),
+    ScheduleModule.forRoot(),
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
       useFactory: createDatabaseOptions,

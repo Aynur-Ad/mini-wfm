@@ -104,15 +104,13 @@ describe('Bildirimler — gerçek PostgreSQL', () => {
         'CreateWorkforceSchema1791803961816',
       ],
     );
-    await source!
-      .getRepository(Notification)
-      .insert({
-        eventId: event.eventId,
-        type: 'workOrderAssigned',
-        workforceUserId: 3,
-        title: 'Korunacak',
-        body: 'Eski kayıt',
-      });
+    await source!.getRepository(Notification).insert({
+      eventId: event.eventId,
+      type: 'workOrderAssigned',
+      workforceUserId: 3,
+      title: 'Korunacak',
+      body: 'Eski kayıt',
+    });
     await source!.runMigrations();
     expect(await source!.query('SELECT name FROM public.migrations')).toEqual([
       { name: 'CreateWorkforceSchema1791803961816' },
@@ -133,5 +131,19 @@ describe('Bildirimler — gerçek PostgreSQL', () => {
     }
     await service.handleAssigned(event);
     expect(await source!.getRepository(Notification).count()).toBe(2);
+  });
+  it('aynı gecikme olayı paralel gelince her alıcıya tek gecikme bildirimi oluşur', async () => {
+    const overdue = { ...event, fromStatus: 'ASSIGNED' };
+    await Promise.all(
+      Array.from({ length: 8 }, () => service.handleOverdue(overdue)),
+    );
+    const rows = await source!.getRepository(Notification).find();
+    expect(rows).toHaveLength(2);
+    expect(
+      rows.every(
+        (row) =>
+          row.type === 'workOrderOverdue' && row.title === 'İş emri gecikti',
+      ),
+    ).toBe(true);
   });
 });
