@@ -24,7 +24,27 @@ const queryClient = new QueryClient({
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
-      <ConfigProvider locale={trTR}>
+      <ConfigProvider
+        locale={trTR}
+        theme={{
+          token: {
+            colorPrimary: "#b84d16",
+            colorSuccess: "#287651",
+            colorLink: "#23664c",
+            colorText: "#1b3328",
+            borderRadius: 10,
+            fontFamily: 'Inter, "Segoe UI", sans-serif',
+          },
+          components: {
+            Menu: {
+              darkItemBg: "#153e30",
+              darkItemSelectedBg: "#285744",
+              darkItemSelectedColor: "#fff7ec",
+            },
+            Table: { headerBg: "#f3f6f0" },
+          },
+        }}
+      >
         <RouterProvider router={router} />
       </ConfigProvider>
     </QueryClientProvider>

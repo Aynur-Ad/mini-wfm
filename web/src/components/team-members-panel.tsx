@@ -68,7 +68,13 @@ function RemoveMemberButton({
   );
 }
 
-export function TeamMembersPanel({ team }: { team: TeamDetail }) {
+export function TeamMembersPanel({
+  team,
+  canManage,
+}: {
+  team: TeamDetail;
+  canManage: boolean;
+}) {
   const [modalOpen, setModalOpen] = useState(false);
   const [messageApi, contextHolder] = message.useMessage();
   const columns: TableColumnsType<TeamMember> = [
@@ -122,28 +128,32 @@ export function TeamMembersPanel({ team }: { team: TeamDetail }) {
         <Typography.Title level={4} style={{ margin: 0 }}>
           Üyeler
         </Typography.Title>
-        <Tooltip
-          title={
-            !team.isActive
-              ? "Pasif ekibe personel eklenemez. Önce ekibi aktif hale getirin."
-              : undefined
-          }
-        >
-          <span style={{ display: "inline-block" }}>
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              disabled={!team.isActive}
-              onClick={() => setModalOpen(true)}
-            >
-              Üye Ekle
-            </Button>
-          </span>
-        </Tooltip>
+        {canManage && (
+          <Tooltip
+            title={
+              !team.isActive
+                ? "Pasif ekibe personel eklenemez. Önce ekibi aktif hale getirin."
+                : undefined
+            }
+          >
+            <span style={{ display: "inline-block" }}>
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                disabled={!team.isActive}
+                onClick={() => setModalOpen(true)}
+              >
+                Üye Ekle
+              </Button>
+            </span>
+          </Tooltip>
+        )}
       </div>
       <Table<TeamMember>
         rowKey="id"
-        columns={columns}
+        columns={
+          canManage ? columns : columns.filter(({ key }) => key !== "actions")
+        }
         dataSource={team.members}
         locale={{ emptyText: "Bu ekibe henüz personel atanmamış" }}
         scroll={{ x: 650 }}
@@ -153,7 +163,7 @@ export function TeamMembersPanel({ team }: { team: TeamDetail }) {
           showSizeChanger: false,
         }}
       />
-      {modalOpen && (
+      {canManage && modalOpen && (
         <AddTeamMemberModal
           key={team.id}
           team={team}

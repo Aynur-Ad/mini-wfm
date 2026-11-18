@@ -1,4 +1,5 @@
 // web/src/pages/teams-page.tsx
+import { useSession } from "../auth/use-session";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -29,6 +30,7 @@ import type { Team } from "../types";
 const { Title } = Typography;
 
 export function TeamsPage() {
+  const { canManagePeople } = useSession();
   const [page, setPage] = useState<number>(1);
   const [limit, setLimit] = useState<number>(10);
   const [searchInput, setSearchInput] = useState<string>("");
@@ -130,12 +132,14 @@ export function TeamsPage() {
 
         return (
           <Space size="small">
-            <Switch
-              size="small"
-              checked={isActive}
-              loading={isRowToggling}
-              onChange={(checked) => handleToggleStatus(record, checked)}
-            />
+            {canManagePeople && (
+              <Switch
+                size="small"
+                checked={isActive}
+                loading={isRowToggling}
+                onChange={(checked) => handleToggleStatus(record, checked)}
+              />
+            )}
             {isActive ? (
               <Tag color="green">Aktif</Tag>
             ) : (
@@ -204,13 +208,15 @@ export function TeamsPage() {
         <Title level={3} style={{ margin: 0 }}>
           Ekipler
         </Title>
-        <Button
-          type="primary"
-          icon={<PlusOutlined />}
-          onClick={handleOpenCreateModal}
-        >
-          Yeni Ekip
-        </Button>
+        {canManagePeople && (
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={handleOpenCreateModal}
+          >
+            Yeni Ekip
+          </Button>
+        )}
       </div>
 
       <Space style={{ marginBottom: 16 }} wrap>
@@ -257,7 +263,11 @@ export function TeamsPage() {
       ) : (
         <Table<Team>
           rowKey="id"
-          columns={columns}
+          columns={
+            canManagePeople
+              ? columns
+              : columns.filter(({ key }) => key !== "actions")
+          }
           dataSource={data?.data ?? []}
           loading={isFetching}
           locale={{ emptyText: "Kayıt bulunamadı" }}
@@ -279,11 +289,13 @@ export function TeamsPage() {
         />
       )}
 
-      <TeamFormModal
-        open={isModalOpen}
-        team={editingTeam}
-        onClose={handleCloseModal}
-      />
+      {canManagePeople && (
+        <TeamFormModal
+          open={isModalOpen}
+          team={editingTeam}
+          onClose={handleCloseModal}
+        />
+      )}
     </div>
   );
 }

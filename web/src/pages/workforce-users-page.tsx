@@ -1,3 +1,4 @@
+import { useSession } from "../auth/use-session";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -126,6 +127,7 @@ function PersonActions({
 }
 
 export function WorkforceUsersPage() {
+  const { canManagePeople } = useSession();
   const [messageApi, contextHolder] = message.useMessage();
   const [params, setParams] = useState<ListParams>({ page: 1, limit: 10 });
   const [searchInput, setSearchInput] = useState("");
@@ -202,18 +204,23 @@ export function WorkforceUsersPage() {
     {
       title: "Durum",
       key: "status",
-      render: (_value: unknown, person: WorkforceUser) => (
-        <PersonStatus
-          person={person}
-          onChanged={(checked) => {
-            void messageApi.success(
-              checked
-                ? "Personel aktif hale getirildi"
-                : "Personel pasif hale getirildi",
-            );
-          }}
-        />
-      ),
+      render: (_value: unknown, person: WorkforceUser) =>
+        canManagePeople ? (
+          <PersonStatus
+            person={person}
+            onChanged={(checked) => {
+              void messageApi.success(
+                checked
+                  ? "Personel aktif hale getirildi"
+                  : "Personel pasif hale getirildi",
+              );
+            }}
+          />
+        ) : (
+          <Tag color={person.isActive ? "green" : "default"}>
+            {person.isActive ? "Aktif" : "Pasif"}
+          </Tag>
+        ),
     },
     {
       title: "İşlemler",
@@ -250,9 +257,11 @@ export function WorkforceUsersPage() {
         <Typography.Title level={3} style={{ margin: 0 }}>
           Personeller
         </Typography.Title>
-        <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-          Yeni Personel
-        </Button>
+        {canManagePeople && (
+          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+            Yeni Personel
+          </Button>
+        )}
       </div>
       <Space wrap style={{ marginBottom: 16 }}>
         <Input
@@ -301,7 +310,11 @@ export function WorkforceUsersPage() {
       ) : (
         <Table<WorkforceUser>
           rowKey="id"
-          columns={columns}
+          columns={
+            canManagePeople
+              ? columns
+              : columns.filter(({ key }) => key !== "actions")
+          }
           dataSource={data?.data ?? []}
           loading={isFetching}
           locale={{ emptyText: "Kayıt bulunamadı" }}
@@ -321,12 +334,14 @@ export function WorkforceUsersPage() {
           }}
         />
       )}
-      <WorkforceUserFormModal
-        open={modalOpen}
-        person={editingPerson}
-        onClose={closeModal}
-        onSaved={() => setParams((current) => ({ ...current, page: 1 }))}
-      />
+      {canManagePeople && (
+        <WorkforceUserFormModal
+          open={modalOpen}
+          person={editingPerson}
+          onClose={closeModal}
+          onSaved={() => setParams((current) => ({ ...current, page: 1 }))}
+        />
+      )}
     </div>
   );
 }

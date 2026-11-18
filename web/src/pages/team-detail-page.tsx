@@ -1,4 +1,5 @@
 // web/src/pages/team-detail-page.tsx
+import { useSession } from "../auth/use-session";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
@@ -25,6 +26,7 @@ import { TeamMembersPanel } from "../components/team-members-panel";
 const { Title } = Typography;
 
 export function TeamDetailPage() {
+  const { canManagePeople } = useSession();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [isEditModalOpen, setIsEditModalOpen] = useState<boolean>(false);
@@ -123,13 +125,15 @@ export function TeamDetailPage() {
         <Title level={3} style={{ margin: 0 }}>
           {team.name}
         </Title>
-        <Button
-          type="primary"
-          icon={<EditOutlined />}
-          onClick={() => setIsEditModalOpen(true)}
-        >
-          Düzenle
-        </Button>
+        {canManagePeople && (
+          <Button
+            type="primary"
+            icon={<EditOutlined />}
+            onClick={() => setIsEditModalOpen(true)}
+          >
+            Düzenle
+          </Button>
+        )}
       </div>
 
       {/* Ekip Detay Bilgileri */}
@@ -172,14 +176,16 @@ export function TeamDetailPage() {
         ]}
       />
 
-      <TeamMembersPanel key={team.id} team={team} />
+      <TeamMembersPanel key={team.id} team={team} canManage={canManagePeople} />
 
       {/* MWFM-14'te yaptığımız düzenleme modal'ı */}
-      <TeamFormModal
-        open={isEditModalOpen}
-        team={team}
-        onClose={() => setIsEditModalOpen(false)}
-      />
+      {canManagePeople && (
+        <TeamFormModal
+          open={isEditModalOpen}
+          team={team}
+          onClose={() => setIsEditModalOpen(false)}
+        />
+      )}
     </div>
   );
 }

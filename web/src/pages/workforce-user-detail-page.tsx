@@ -1,3 +1,4 @@
+import { useSession } from "../auth/use-session";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
@@ -22,6 +23,7 @@ import { useWorkforceUser } from "../hooks/use-workforce-users";
 import { formatPhone } from "../utils/format-phone";
 
 export function WorkforceUserDetailPage() {
+  const { canManagePeople } = useSession();
   const { id } = useParams<{ id: string }>();
   const [modalOpen, setModalOpen] = useState(false);
   const personId = Number(id);
@@ -110,13 +112,15 @@ export function WorkforceUserDetailPage() {
         </Typography.Title>
         <Space>
           {back}
-          <Button
-            type="primary"
-            icon={<EditOutlined />}
-            onClick={() => setModalOpen(true)}
-          >
-            Düzenle
-          </Button>
+          {canManagePeople && (
+            <Button
+              type="primary"
+              icon={<EditOutlined />}
+              onClick={() => setModalOpen(true)}
+            >
+              Düzenle
+            </Button>
+          )}
         </Space>
       </div>
       <Descriptions
@@ -156,11 +160,13 @@ export function WorkforceUserDetailPage() {
           },
         ]}
       />
-      <WorkforceUserFormModal
-        open={modalOpen}
-        person={person}
-        onClose={() => setModalOpen(false)}
-      />
+      {canManagePeople && (
+        <WorkforceUserFormModal
+          open={modalOpen}
+          person={person}
+          onClose={() => setModalOpen(false)}
+        />
+      )}
     </div>
   );
 }
