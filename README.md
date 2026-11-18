@@ -1,6 +1,6 @@
 # Mini WFM
 
-Mini WFM; saha ekipleri, personeller, vardiyalar ve iş emirleri için geliştirilen bir iş gücü yönetimi uygulamasıdır. Backend; kullanıcı hesapları, rol kontrolü, aylık puantaj, vardiya rotasyonu, ekip önerisi ve iş emri atama ve gecikme bildirimlerini içerir. React arayüzünde ekip ve personel ekranları bulunur.
+Mini WFM, saha ekipleri, personel, vardiyalar ve iş emirleri için bir iş gücü yönetimi uygulamasıdır.
 
 ## Mimari
 
@@ -164,7 +164,7 @@ Yeni hesaplar ADMIN tarafından `POST /api/accounts` ile oluşturulur. `GET /api
 | İşlem | VIEWER | PLANNER | ADMIN |
 | --- | --- | --- | --- |
 | Ekip, personel, vardiya ve iş emirlerini okuma | ✓ | ✓ | ✓ |
-| Puantaj, ekip önerisi ve bildirimleri okuma | ✓ | ✓ | ✓ |
+| Puantaj, ekip önerisi, bildirim ve rapor okuma | ✓ | ✓ | ✓ |
 | Ekip/personel oluşturma, güncelleme, silme ve üyelik yönetimi | — | — | ✓ |
 | Hesap oluşturma ve listeleme | — | — | ✓ |
 | Vardiya oluşturma, güncelleme, silme ve toplu atama | — | ✓ | ✓ |
@@ -173,45 +173,6 @@ Yeni hesaplar ADMIN tarafından `POST /api/accounts` ile oluşturulur. `GET /api
 | IN_PROGRESS iş emrini iptal etme | — | — | ✓ |
 
 Geçersiz veya süresi dolmuş token `401`, yetersiz rol `403` döndürür. Yetki kontrolü API'de yapılır.
-
-## Temel kullanım
-
-Endpoint'lerin istek ve yanıt şemaları Swagger'da bulunur.
-
-| Özellik | Endpoint |
-| --- | --- |
-| Ekipler | `GET /api/teams`, `POST /api/teams` |
-| Personeller | `GET /api/workforce-users`, `POST /api/workforce-users` |
-| Ekibe üye ekleme | `POST /api/teams/:id/members` |
-| Vardiyalar | `GET /api/shifts`, `POST /api/shifts` |
-| Ekibe toplu vardiya | `POST /api/teams/:id/shifts` |
-| Aylık puantaj | `GET /api/workforce-users/:id/timesheet?month=2026-11` |
-| Vardiya rotasyonu | `POST /api/teams/:id/rotation-plan` |
-| İş emirleri | `GET /api/work-orders`, `POST /api/work-orders` |
-| İş emri durum değiştirme | `PATCH /api/work-orders/:id/status` |
-| İş emri geçmişi | `GET /api/work-orders/:id/history` |
-| Ekip önerisi | `GET /api/work-orders/:id/team-suggestions` |
-| Personelin bildirimleri | `GET /api/notifications?workforceUserId=8` |
-
-Kısa bir deneme için yöneticiyle giriş yapın, aktif bir ekip ve aktif personel oluşturup personeli ekibe ekleyin. OPEN bir iş emri oluşturun; güncel `version` ve `teamId` ile durumunu `ASSIGNED` yapın. Ardından ekibin aktif personelinin ID'siyle bildirim endpoint'ini çağırın. Yanıtta `Yeni iş emri atandı` bildirimi görünmelidir.
-
-İş emri oluşturma ve durum geçmişi aynı transaction'da tutulur. Güncelleme ve durum değişikliğinde güncel `version` gönderilmelidir; eski sürüm `409` döndürür. İş emirleri silinmez, izin verilen geçişlerle iptal edilir veya tamamlanır.
-
-Atama olayları COMMIT sonrasında yayınlanır. Bildirim servisi kapalıyken broker'a ulaşan olaylar kuyrukta bekler; servis açılınca işlenir. Aynı olay tekrar geldiğinde bildirim çoğalmaz. Correlation id, HTTP isteğinden TCP çağrılarına ve RabbitMQ olayına taşınır.
-
-## Geciken iş emirleri
-
-Workforce-service, son tarihi geçmiş ve COMPLETED/CANCELLED durumunda olmayan iş emirlerini varsayılan olarak her 15 dakikada kontrol eder. Kontrol aralığı `workforce-service/.env` içinden değiştirilebilir:
-
-```dotenv
-OVERDUE_CHECK_CRON=0 */15 * * * *
-```
-
-Geliştirmede her dakika kontrol etmek için `OVERDUE_CHECK_CRON=0 * * * * *` kullanın ve workforce-service'i yeniden başlatın. Cron ifadesinin ilk alanı saniyedir; zamanlama UTC üzerinden yapılır.
-
-Her iş emri için bir `workOrderOverdue` olayı yayınlanır. Bildirim servisi ekibin aktif üyelerine **İş emri gecikti** bildirimi oluşturur. İş emrinin son tarihi daha ileri bir tarihe güncellendiğinde gecikme işareti sıfırlanır; yeni son tarih de geçerse yeniden bildirim oluşabilir. Son tarihi değiştirmeden yapılan güncellemeler yeni bildirim üretmez.
-
-Kontrol her çalıştığında bulduğu iş emri sayısını ve correlation id'yi loglar. Birden fazla servis kopyası aynı veritabanında satır kilidi ve `SKIP LOCKED` kullanır; aynı kayıt aynı anda yalnızca bir kopya tarafından işaretlenir. Yayın COMMIT sonrasında yapıldığından B23'teki olay kaybı sınırlaması bu olay için de geçerlidir.
 
 ## Testler
 
@@ -262,7 +223,7 @@ pnpm --dir web lint
 | Vardiyada ekip filtresi (MWFM-29) | Personelin güncel ekibine göre çalışır. Geçmiş ekip üyeliği saklanmadığı için vardiya tarihindeki ekip üyeliğini göstermez. |
 | Puantaj takvimi | Resmî tatil verisi 2026–2027 ile sınırlıdır. |
 | Rotasyon | Greedy planlama kullanılır; her durumda en iyi planı bulma garantisi yoktur. |
-| Mevcut kapsam | Ekip özet raporu, uygulama Docker paketlemesi, frontend giriş/rol kontrolü ve iş emri ekranları henüz eklenmemiştir. |
+| Mevcut kapsam | Uygulama Docker paketlemesi, frontend giriş/rol kontrolü ve iş emri ekranları henüz eklenmemiştir. |
 
 ## Durdurma ve sorun giderme
 

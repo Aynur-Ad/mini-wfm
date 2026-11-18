@@ -1,4 +1,5 @@
 import { ScheduleModule } from '@nestjs/schedule';
+import { ReportsModule } from './reports/reports.module.js';
 import { WorkOrdersModule } from './work-orders/work-orders.module.js';
 import { ShiftsModule } from './shifts/shifts.module.js';
 import { AccountsModule } from './accounts/accounts.module.js';
@@ -24,6 +25,7 @@ import { WorkforceUsersModule } from './workforce_users/workforce_users.module.j
       inject: [ConfigService],
       useFactory: createDatabaseOptions,
     }),
+    ReportsModule,
     WorkOrdersModule,
     ShiftsModule,
     AccountsModule,
