@@ -32,18 +32,7 @@ git clone https://github.com/Aynur-Ad/mini-wfm.git mini-vfm
 cd mini-vfm
 ```
 
-### 2. Bağımlılıkları kurun
-
-Her uygulamanın ayrı `package.json` ve `pnpm-lock.yaml` dosyası vardır.
-
-```powershell
-pnpm --dir api install --frozen-lockfile
-pnpm --dir workforce-service install --frozen-lockfile
-pnpm --dir notification-service install --frozen-lockfile
-pnpm --dir web install --frozen-lockfile
-```
-
-### 3. Ortam dosyalarını hazırlayın
+### 2. Ortam dosyalarını hazırlayın
 
 Aşağıdaki komutlar yalnızca eksik `.env` dosyalarını oluşturur:
 
@@ -72,7 +61,7 @@ RABBITMQ_URL=amqp://mini_wfm:local_dev_only@127.0.0.1:5672
 RABBITMQ_QUEUE=work_order_events
 ```
 
-Bunlar Compose'daki yerel RabbitMQ kullanıcı ve şifresidir. Workforce-service'te `EVENT_PUBLISH_TIMEOUT_MS` varsayılanı `1500` milisaniyedir.
+Compose, backend container’larına ağ içi PostgreSQL ve RabbitMQ adreslerini verir. Yukarıdaki bağlantı adresleri yerel geliştirme içindir. Workforce-service'te `EVENT_PUBLISH_TIMEOUT_MS` varsayılanı `1500` milisaniyedir.
 
 API'nin servis bağlantıları:
 
@@ -92,7 +81,7 @@ node -e "process.stdout.write(require('node:crypto').randomBytes(32).toString('h
 
 Uygulamalar açılışta ortam değişkenlerini doğrular; zorunlu ayarlar eksik veya hatalıysa başlamaz.
 
-### 4. İlk yönetici hesabını ayarlayın
+### 3. İlk yönetici hesabını ayarlayın
 
 İlk çalıştırmadan önce `workforce-service/.env` içindeki şu alanları doldurun:
 
@@ -105,25 +94,37 @@ INITIAL_ADMIN_PASSWORD=
 
 İlk yönetici seed migration'ıyla bir kez oluşturulur. Sonradan `.env` içindeki şifreyi değiştirmek mevcut hesabın şifresini değiştirmez. Kullanıcı adları küçük harfle saklanır.
 
-### 5. Altyapıyı başlatın
-
-PostgreSQL ve RabbitMQ tek komutla başlatılır:
-
-```powershell
-docker compose up -d
-```
-
-Durumu kontrol edin:
-
-```powershell
-docker compose ps
-```
-
-Mevcut Compose dosyası yalnızca altyapıyı içerir. Uygulamaların tamamını tek komutla başlatan Docker paketlemesi henüz eklenmemiştir; uygulamalar aşağıdaki gibi ayrı terminallerde çalıştırılır.
-
 ## Uygulamaları çalıştırma
 
-PostgreSQL ve RabbitMQ hazır olduktan sonra dört ayrı terminal açın. Her terminal proje kökünde olsun.
+### Docker ile backend
+
+Ortam dosyalarını hazırladıktan sonra proje kökünde çalıştırın:
+
+```powershell
+docker compose --profile backend up --build -d --wait
+```
+
+Bu komut PostgreSQL, RabbitMQ ve üç backend uygulamasını başlatır. Servisler açılırken bekleyen migration'lar otomatik uygulanır. Swagger'a `http://localhost:3000/docs` adresinden erişebilirsiniz.
+
+### Yerelde geliştirme
+
+Backend Docker'da çalışıyorsa önce uygulama container'larını durdurun:
+
+```powershell
+docker compose --profile backend stop api workforce-service notification-service
+```
+
+Altyapıyı başlatıp yerelde çalıştıracağınız uygulamaların bağımlılıklarını kurun:
+
+```powershell
+docker compose up -d --wait
+pnpm --dir api install --frozen-lockfile
+pnpm --dir workforce-service install --frozen-lockfile
+pnpm --dir notification-service install --frozen-lockfile
+pnpm --dir web install --frozen-lockfile
+```
+
+Her yerel uygulamayı proje kökünden ayrı bir terminalde başlatın. Backend Docker'da çalışıyorsa web için yalnızca web kurulum ve çalıştırma komutları yeterlidir.
 
 | Terminal | Komut |
 | --- | --- |
@@ -149,8 +150,8 @@ Web'de giriş ve token yönetimi henüz bulunmadığından korunan API işlemler
 | --- | --- | --- |
 | Web | 5173 | HTTP; Vite geliştirme sunucusu |
 | API ve Swagger | 3000 | HTTP; `/api` ve `/docs` |
-| Workforce service | 4001 | TCP |
-| Notification service | 4002 | TCP |
+| Workforce service | 4001 | TCP. Docker ağında servisler arası erişim. |
+| Notification service | 4002 | TCP. Docker ağında servisler arası erişim. |
 | PostgreSQL | 5433 → 5432 | Bilgisayardan erişim → container içi port |
 | RabbitMQ | 5672 | AMQP |
 | RabbitMQ yönetimi | 15672 | HTTP |
@@ -223,14 +224,14 @@ pnpm --dir web lint
 | Vardiyada ekip filtresi (MWFM-29) | Personelin güncel ekibine göre çalışır. Geçmiş ekip üyeliği saklanmadığı için vardiya tarihindeki ekip üyeliğini göstermez. |
 | Puantaj takvimi | Resmî tatil verisi 2026–2027 ile sınırlıdır. |
 | Rotasyon | Greedy planlama kullanılır; her durumda en iyi planı bulma garantisi yoktur. |
-| Mevcut kapsam | Uygulama Docker paketlemesi, frontend giriş/rol kontrolü ve iş emri ekranları henüz eklenmemiştir. |
+| Mevcut kapsam | Frontend giriş/rol kontrolü ve iş emri ekranları henüz eklenmemiştir. |
 
 ## Durdurma ve sorun giderme
 
 Uygulama terminallerini `Ctrl+C` ile durdurun. Altyapıyı kapatmak için:
 
 ```powershell
-docker compose down
+docker compose --profile backend down
 ```
 
 Volume'ler silinmediği için veriler korunur.
