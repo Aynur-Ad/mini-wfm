@@ -4,11 +4,13 @@ import { NotificationsController } from './notifications.controller.js';
 import type { NotificationsService } from './notifications.service.js';
 import { requestContext } from '../common/logging/request-context.js';
 import { event } from '../test/test-event.js';
+const overdueEvent = { ...event, fromStatus: 'ASSIGNED' };
 function setup() {
   const ack = vi.fn(),
     nack = vi.fn(),
     message = {};
   const context = new RmqContext([message, { ack, nack }, 'workOrderAssigned']);
+  const handleOverdue = vi.fn().mockResolvedValue(undefined);
   const handleAssigned = vi.fn().mockResolvedValue(undefined),
     findAll = vi.fn().mockResolvedValue({ data: [] });
   return {
@@ -17,9 +19,11 @@ function setup() {
     message,
     context,
     handleAssigned,
+    handleOverdue,
     findAll,
     controller: new NotificationsController({
       handleAssigned,
+      handleOverdue,
       findAll,
     } as unknown as NotificationsService),
   };
@@ -71,5 +75,18 @@ describe('RabbitMQ manuel ACK', () => {
       data: { workforceUserId: 3 },
     });
     expect(s.findAll).toHaveBeenCalledWith({ workforceUserId: 3 });
+  });
+  it('gecikme mesajını kaydettikten sonra ack eder', async () => {
+    const s = setup();
+    await s.controller.handleOverdue(overdueEvent, s.context);
+    expect(s.handleOverdue).toHaveBeenCalledWith(overdueEvent);
+    expect(s.ack).toHaveBeenCalledOnce();
+  });
+  it('gecikme kaydında hata olursa yeniden kuyruğa alır', async () => {
+    const s = setup();
+    s.handleOverdue.mockRejectedValue(new Error('db down'));
+    await s.controller.handleOverdue(overdueEvent, s.context);
+    expect(s.ack).not.toHaveBeenCalled();
+    expect(s.nack).toHaveBeenCalledWith(s.message, false, true);
   });
 });

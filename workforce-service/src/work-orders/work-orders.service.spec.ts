@@ -327,4 +327,26 @@ describe('WorkOrdersService', () => {
     });
     expect(mutation.execute).not.toHaveBeenCalled();
   });
+  it('son tarih ileri alınırsa gecikme işareti sıfırlanır', async () => {
+    current.overdueNotifiedAt = new Date('2098-12-31T00:00:00Z');
+    await service.update(1, {
+      id: 1,
+      version: 1,
+      dueAt: '2099-01-03T00:00:00Z',
+    });
+    expect(changes.overdueNotifiedAt).toBeNull();
+  });
+  it('başlık değişirse gecikme işareti korunur', async () => {
+    current.overdueNotifiedAt = new Date('2098-12-31T00:00:00Z');
+    await service.update(1, { id: 1, version: 1, title: 'Yeni başlık' });
+    expect(changes).not.toHaveProperty('overdueNotifiedAt');
+  });
+  it('aynı veya daha erken son tarih gecikme işaretini sıfırlamaz', async () => {
+    await service.update(1, {
+      id: 1,
+      version: 1,
+      dueAt: current.dueAt.toISOString(),
+    });
+    expect(changes).not.toHaveProperty('overdueNotifiedAt');
+  });
 });

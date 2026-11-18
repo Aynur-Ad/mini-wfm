@@ -1,3 +1,4 @@
+import { OverdueWorkOrdersService } from './overdue-work-orders.service.js';
 import { TeamSuggestionsController } from './team-suggestions.controller.js';
 import { TeamSuggestionsService } from './team-suggestions.service.js';
 import { WorkOrderStatusHistory } from './entities/work-order-status-history.entity.js';
@@ -11,6 +12,7 @@ import { WorkOrdersService } from './work-orders.service.js';
   imports: [TypeOrmModule.forFeature([WorkOrder, WorkOrderStatusHistory])],
   controllers: [WorkOrdersController, TeamSuggestionsController],
   providers: [
+    OverdueWorkOrdersService,
     WorkOrdersService,
     TeamSuggestionsService,
     WorkOrderEventsPublisher,

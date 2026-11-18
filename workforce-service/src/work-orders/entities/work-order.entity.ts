@@ -47,6 +47,8 @@ export class WorkOrder {
   })
   team: Relation<Team> | null;
   @Column({ type: 'timestamptz' }) dueAt: Date;
+  @Column({ type: 'timestamptz', nullable: true })
+  overdueNotifiedAt: Date | null;
   @VersionColumn({ type: 'int', default: 1 }) version: number;
   @Column({ type: 'int' }) createdById: number;
   @ManyToOne(() => Account, { nullable: false, onDelete: 'RESTRICT' })

@@ -3,6 +3,7 @@ import type { Repository } from 'typeorm';
 import { NotificationsService } from './notifications.service.js';
 import type { Notification } from './notification.entity.js';
 import { event } from '../test/test-event.js';
+const overdueEvent = { ...event, fromStatus: 'ASSIGNED' };
 function setup() {
   const values = vi.fn().mockReturnThis(),
     execute = vi.fn().mockResolvedValue({});
@@ -85,4 +86,35 @@ describe('Bildirim kayıtları', () => {
       error: { statusCode: 400 },
     });
   });
+  it('gecikme olayı aktif alıcılar için doğru başlık/type ile yazılır, tekrar teslim çoğaltmaz', async () => {
+    const s = setup();
+    await s.service.handleOverdue(overdueEvent);
+    expect(s.values.mock.calls[0][0]).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'workOrderOverdue',
+          title: 'İş emri gecikti',
+          workforceUserId: 3,
+        }),
+        expect.objectContaining({ workforceUserId: 4 }),
+      ]),
+    );
+    s.query.mockResolvedValue([]);
+    await s.service.handleOverdue(overdueEvent);
+    expect(s.execute).toHaveBeenCalledOnce();
+  });
+  it.each(['COMPLETED', 'CANCELLED'])(
+    'kapanmış %s gecikme olayını reddeder',
+    async (status) => {
+      const s = setup();
+      await expect(
+        s.service.handleOverdue({
+          ...event,
+          fromStatus: status,
+          toStatus: status,
+        }),
+      ).rejects.toThrow();
+      expect(s.transaction).not.toHaveBeenCalled();
+    },
+  );
 });

@@ -10,7 +10,7 @@ export class WorkOrderEventsPublisher {
   private readonly logger = new Logger(WorkOrderEventsPublisher.name);
   constructor(private readonly config: ConfigService<Environment, true>) {}
   async publish(
-    type: 'workOrderStatusChanged' | 'workOrderAssigned',
+    type: 'workOrderStatusChanged' | 'workOrderAssigned' | 'workOrderOverdue',
     event: WorkOrderEvent,
   ): Promise<void> {
     let client: ClientProxy | undefined;
@@ -35,15 +35,13 @@ export class WorkOrderEventsPublisher {
       });
       // Broker onayı beklenir; notification-service'in işlemesi beklenmez.
       await firstValueFrom(
-        client
-          .emit(type, event)
-          .pipe(
-            timeout(
-              this.config.getOrThrow('EVENT_PUBLISH_TIMEOUT_MS', {
-                infer: true,
-              }),
-            ),
+        client.emit(type, event).pipe(
+          timeout(
+            this.config.getOrThrow('EVENT_PUBLISH_TIMEOUT_MS', {
+              infer: true,
+            }),
           ),
+        ),
       );
     } catch {
       // B23: Ham hata, URL, şifre veya olay gövdesi loglanmaz. Ana işlem korunur.

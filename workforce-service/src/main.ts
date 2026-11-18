@@ -28,6 +28,7 @@ async function bootstrap() {
     },
     { inheritAppConfig: true },
   );
+  await app.init();
   await app.startAllMicroservices();
   logger.log(`Workforce microservice is listening on TCP ${host}:${port}`);
 }

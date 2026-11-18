@@ -18,6 +18,28 @@ export class NotificationsService {
   ) {}
   async handleAssigned(input: WorkOrderEvent): Promise<void> {
     const event = readEvent(input, true);
+    return this.store(
+      event,
+      'workOrderAssigned',
+      'Yeni iş emri atandı',
+      `${event.workOrderCode} numaralı iş emri ekibinize atandı.`,
+    );
+  }
+  async handleOverdue(input: WorkOrderEvent): Promise<void> {
+    const event = readEvent(input, 'overdue');
+    return this.store(
+      event,
+      'workOrderOverdue',
+      'İş emri gecikti',
+      `${event.workOrderCode} numaralı iş emrinin süresi doldu.`,
+    );
+  }
+  private async store(
+    event: WorkOrderEvent,
+    type: string,
+    title: string,
+    body: string,
+  ): Promise<void> {
     await this.repository.manager.transaction(async (manager) => {
       // Kaynak eventId burada tekildir; paralel teslimler PK üzerinde bekler.
       const rows = await manager.query<{ event_id: string }[]>(
@@ -35,10 +57,10 @@ export class NotificationsService {
         .values(
           ids.map((workforceUserId) => ({
             eventId: event.eventId,
-            type: 'workOrderAssigned',
+            type,
             workforceUserId,
-            title: 'Yeni iş emri atandı',
-            body: `${event.workOrderCode} numaralı iş emri ekibinize atandı.`,
+            title,
+            body,
           })),
         )
         .orIgnore()

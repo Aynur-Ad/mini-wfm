@@ -170,3 +170,32 @@ describe('Çalışma kuralı ayarları', () => {
       MAX_CONSECUTIVE_DAYS: 5,
     }));
 });
+
+describe('Gecikme kontrolü cron ayarı', () => {
+  const settings = {
+    DB_HOST: 'localhost',
+    DB_USER: 'test',
+    DB_PASSWORD: 'test',
+    DB_NAME: 'test',
+    INITIAL_ADMIN_PASSWORD: 'test-password',
+  };
+  it('varsayılanı her 15 dakikadır', () => {
+    expect(validateEnvironment(settings).OVERDUE_CHECK_CRON).toBe(
+      '0 */15 * * * *',
+    );
+  });
+  it('geliştirmede her dakika çalışabilir', () => {
+    expect(
+      validateEnvironment({ ...settings, OVERDUE_CHECK_CRON: '0 * * * * *' })
+        .OVERDUE_CHECK_CRON,
+    ).toBe('0 * * * * *');
+  });
+  it.each(['', 'bad-cron', '0 61 * * * *'])(
+    'geçersiz cron reddedilir: %s',
+    (cron) => {
+      expect(() =>
+        validateEnvironment({ ...settings, OVERDUE_CHECK_CRON: cron }),
+      ).toThrow('OVERDUE_CHECK_CRON');
+    },
+  );
+});
