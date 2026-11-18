@@ -142,8 +142,6 @@ Servisler başlarken bekleyen migration'lar otomatik uygulanır; tabloları elle
 
 Web geliştirme sunucusu `/api` isteklerini Vite proxy ile `http://localhost:3000` adresine iletir. API portunu değiştirirseniz proxy hedefini de güncelleyin.
 
-Web'de giriş ve token yönetimi henüz bulunmadığından korunan API işlemlerini Swagger üzerinden kullanın. Frontend giriş ve rol arayüzü tamamlanana kadar web ekranlarının korunan veri istekleri `401` alabilir.
-
 ## Port listesi
 
 | Bileşen | Port | Protokol / kullanım |
@@ -158,7 +156,7 @@ Web'de giriş ve token yönetimi henüz bulunmadığından korunan API işlemler
 
 ## Giriş ve roller
 
-Swagger'da `POST /api/auth/login` ile ilk yönetici hesabınızın kullanıcı adı ve şifresini gönderin. Dönen `accessToken` değerini **Authorize** alanına yapıştırın. `GET /api/auth/me` ile giriş yapan hesabı kontrol edebilirsiniz.
+Web arayüzünde `http://localhost:5173/login` adresinden ilk yönetici hesabınızla giriş yapın. Swagger kullanıyorsanız `POST /api/auth/login` ile kullanıcı adı ve şifrenizi gönderin. Dönen `accessToken` değerini **Authorize** alanına yapıştırın. `GET /api/auth/me` ile giriş yapan hesabı kontrol edebilirsiniz.
 
 Yeni hesaplar ADMIN tarafından `POST /api/accounts` ile oluşturulur. `GET /api/accounts` yalnızca ADMIN'e açıktır. Login ve health dışındaki endpoint'ler token ister.
 
@@ -220,11 +218,11 @@ pnpm --dir web lint
 | Token ömrü (B16) | JWT 8 saat geçerlidir; refresh token yoktur. Hesap veya rol değişikliği mevcut token'a hemen yansımaz. |
 | Olay teslimi (B23) | RabbitMQ'ya yayın başarısız olduğunda ana işlem geri alınmaz. Olay kaybolabilir; COMMIT ile yayın arasındaki süreç kapanması da kayba neden olabilir. Outbox yoktur. |
 | Saat dilimi (B25) | Yerel hesaplamalar ayardan gelen sabit UTC farkını kullanır; Türkiye için UTC+3'tür. Yaz saati değişimleri desteklenmez. |
-| Frontend kimlik doğrulaması (F7) | Giriş ve token yönetimi henüz uygulanmamıştır. Tasarımda öngörülen localStorage kullanımı XSS durumunda token'ın çalınması riskini taşır; httpOnly cookie yaklaşımı kapsam dışındadır. |
+| Frontend kimlik doğrulaması (F7) | Token tarayıcının localStorage alanında tutulur. XSS durumunda token'a erişilebilir. httpOnly cookie kullanımı kapsam dışındadır. |
 | Vardiyada ekip filtresi (MWFM-29) | Personelin güncel ekibine göre çalışır. Geçmiş ekip üyeliği saklanmadığı için vardiya tarihindeki ekip üyeliğini göstermez. |
 | Puantaj takvimi | Resmî tatil verisi 2026–2027 ile sınırlıdır. |
 | Rotasyon | Greedy planlama kullanılır; her durumda en iyi planı bulma garantisi yoktur. |
-| Mevcut kapsam | Frontend giriş/rol kontrolü ve iş emri ekranları henüz eklenmemiştir. |
+| Mevcut kapsam | İş emri ekranları henüz eklenmemiştir. |
 
 ## Durdurma ve sorun giderme
 

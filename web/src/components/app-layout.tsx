@@ -1,89 +1,77 @@
-import React from "react";
-import { Layout, Menu, Typography } from "antd";
-import { TeamOutlined, UserOutlined } from "@ant-design/icons";
+import { Button, Layout, Menu, Tag } from "antd";
+import {
+  BranchesOutlined,
+  LogoutOutlined,
+  TeamOutlined,
+  UserOutlined,
+} from "@ant-design/icons";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
+import { roleLabels, useSession } from "../auth/use-session";
+import { setAccessToken } from "../auth/session";
 
 const { Header, Sider, Content } = Layout;
+const menuItems = [
+  { key: "/teams", icon: <TeamOutlined />, label: "Ekipler" },
+  { key: "/workforce-users", icon: <UserOutlined />, label: "Personeller" },
+];
 
-export const AppLayout: React.FC = () => {
+export function AppLayout() {
   const navigate = useNavigate();
-  const location = useLocation();
-
-  const getSelectedKey = (): string => {
-    if (location.pathname.startsWith("/teams")) {
-      return "/teams";
-    }
-    if (location.pathname.startsWith("/workforce-users")) {
-      return "/workforce-users";
-    }
-    return "";
-  };
-
-  const menuItems = [
-    {
-      key: "/teams",
-      icon: <TeamOutlined />,
-      label: "Ekipler",
-    },
-    {
-      key: "/workforce-users",
-      icon: <UserOutlined />,
-      label: "Personeller",
-    },
-  ];
+  const { pathname } = useLocation();
+  const queryClient = useQueryClient();
+  const { account } = useSession();
+  const user = account.data;
+  const activePage = menuItems.find(
+    ({ key }) => pathname === key || pathname.startsWith(key + "/"),
+  );
+  function logout() {
+    setAccessToken(null);
+    queryClient.clear();
+    void navigate("/login", { replace: true });
+  }
 
   return (
-    <Layout style={{ minHeight: "100vh" }}>
-      <Sider width={220} theme="dark">
-        <div
-          style={{
-            height: 64,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            color: "#fff",
-            fontSize: 18,
-            fontWeight: 600,
-            borderBottom: "1px solid rgba(255, 255, 255, 0.12)",
-          }}
-        >
-          Mini WFM
+    <Layout className="workspace-layout">
+      <Sider
+        width={216}
+        breakpoint="md"
+        collapsedWidth={58}
+        className="workspace-sider"
+      >
+        <div className="brand">
+          <span className="brand-icon">
+            <BranchesOutlined />
+          </span>
+          <span className="brand-name">Mini WFM</span>
         </div>
         <Menu
           theme="dark"
           mode="inline"
-          selectedKeys={[getSelectedKey()]}
+          selectedKeys={activePage ? [activePage.key] : []}
           items={menuItems}
-          onClick={({ key }) => navigate(key)}
+          onClick={({ key }) => void navigate(key)}
         />
       </Sider>
-
-      <Layout>
-        <Header
-          style={{
-            background: "#fff",
-            padding: "0 24px",
-            display: "flex",
-            alignItems: "center",
-            borderBottom: "1px solid #f0f0f0",
-          }}
-        >
-          <Typography.Title level={4} style={{ margin: 0 }}>
-            Mini WFM
-          </Typography.Title>
+      <Layout className="workspace-main">
+        <Header className="workspace-header">
+          <span className="workspace-section">
+            {activePage?.label ?? "Mini WFM"}
+          </span>
+          {user && (
+            <div className="workspace-account">
+              <span className="workspace-username">{user.username}</span>
+              <Tag color="green">{roleLabels[user.role]}</Tag>
+              <Button icon={<LogoutOutlined />} onClick={logout}>
+                Çıkış
+              </Button>
+            </div>
+          )}
         </Header>
-
-        <Content
-          style={{
-            margin: 24,
-            padding: 24,
-            background: "#fff",
-            borderRadius: 8,
-          }}
-        >
+        <Content className="workspace-content">
           <Outlet />
         </Content>
       </Layout>
     </Layout>
   );
-};
+}

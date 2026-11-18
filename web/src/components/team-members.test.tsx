@@ -601,3 +601,24 @@ describe("Ekip üyeleri ekranı", () => {
     ).toBe(true);
   });
 });
+const permission = vi.hoisted(() => ({ canManagePeople: true }));
+vi.mock("../auth/use-session", () => ({
+  useSession: () => permission,
+}));
+
+it("salt okunur oturumda ekip ve personel değişikliklerini gizler", async () => {
+  permission.canManagePeople = false;
+  try {
+    renderPage({ peopleList: true });
+    expect(
+      await screen.findByRole("region", { name: "Ekip üyeleri" }),
+    ).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Düzenle" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Üye Ekle" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Çıkar" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Yeni Personel" })).toBeNull();
+    expect(screen.queryByRole("switch")).toBeNull();
+  } finally {
+    permission.canManagePeople = true;
+  }
+});

@@ -1,3 +1,5 @@
+import { LoginPage } from "./pages/login-page";
+import { RequireSession } from "./components/require-session";
 import { createBrowserRouter, Navigate } from "react-router-dom";
 import { AppLayout } from "./components/app-layout";
 import { TeamsPage } from "./pages/teams-page";
@@ -7,33 +9,39 @@ import { WorkforceUserDetailPage } from "./pages/workforce-user-detail-page";
 import { NotFoundPage } from "./pages/not-found-page";
 
 export const router = createBrowserRouter([
+  { path: "/login", element: <LoginPage /> },
   {
-    path: "/",
-    element: <AppLayout />,
+    element: <RequireSession />,
     children: [
       {
-        index: true,
-        element: <Navigate to="/teams" replace />,
-      },
-      {
-        path: "teams",
-        element: <TeamsPage />,
-      },
-      {
-        path: "teams/:id",
-        element: <TeamDetailPage />,
-      },
-      {
-        path: "workforce-users",
-        element: <WorkforceUsersPage />,
-      },
-      {
-        path: "workforce-users/:id",
-        element: <WorkforceUserDetailPage />,
-      },
-      {
-        path: "*",
-        element: <NotFoundPage />,
+        path: "/",
+        element: <AppLayout />,
+        children: [
+          {
+            index: true,
+            element: <Navigate to="/teams" replace />,
+          },
+          {
+            path: "teams",
+            element: <TeamsPage />,
+          },
+          {
+            path: "teams/:id",
+            element: <TeamDetailPage />,
+          },
+          {
+            path: "workforce-users",
+            element: <WorkforceUsersPage />,
+          },
+          {
+            path: "workforce-users/:id",
+            element: <WorkforceUserDetailPage />,
+          },
+          {
+            path: "*",
+            element: <NotFoundPage />,
+          },
+        ],
       },
     ],
   },
