@@ -35,6 +35,14 @@ const adminOnly = [AccountRole.ADMIN];
 const routes = [
   {
     method: 'get',
+    path: '/reports/team-summary',
+    pattern: 'findTeamSummary',
+    roles: allRoles,
+    status: 200,
+    query: { from: '2026-11-01T00:00:00Z', to: '2026-12-01T00:00:00Z' },
+  },
+  {
+    method: 'get',
     path: '/work-orders/1/team-suggestions',
     pattern: 'findWorkOrderTeamSuggestions',
     roles: allRoles,

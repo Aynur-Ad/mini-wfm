@@ -1,3 +1,4 @@
+import { ReportsController } from './reports/reports.controller.js';
 import { NotificationsController } from './notifications/notifications.controller.js';
 import { NotificationsService } from './notifications/notifications.service.js';
 import { WorkOrdersController } from './work-orders/work-orders.controller.js';
@@ -76,6 +77,7 @@ import { WorkforceUsersController } from './workforce_users/workforce_users.cont
     ]),
   ],
   controllers: [
+    ReportsController,
     NotificationsController,
     WorkOrdersController,
     ShiftsController,
