@@ -1,6 +1,7 @@
 import { Button, Layout, Menu, Tag } from "antd";
 import {
   BranchesOutlined,
+  ScheduleOutlined,
   LogoutOutlined,
   TeamOutlined,
   UserOutlined,
@@ -12,6 +13,7 @@ import { setAccessToken } from "../auth/session";
 
 const { Header, Sider, Content } = Layout;
 const menuItems = [
+  { key: "/work-orders", icon: <ScheduleOutlined />, label: "İş Emirleri" },
   { key: "/teams", icon: <TeamOutlined />, label: "Ekipler" },
   { key: "/workforce-users", icon: <UserOutlined />, label: "Personeller" },
 ];
