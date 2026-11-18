@@ -200,3 +200,103 @@ body {
     justify-content: flex-end;
   }
 }
+
+.order-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+.order-heading h1 {
+  font-size: clamp(25px, 3vw, 36px);
+  line-height: 1.15;
+  letter-spacing: -0.04em;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.order-heading p {
+  margin: 8px 0 0;
+  color: #52645a;
+}
+.order-detail-heading {
+  margin-top: 18px;
+}
+.order-code {
+  color: #216248;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.order-detail-heading .order-code {
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+.order-filters {
+  display: grid;
+  grid-template-columns: minmax(210px, 1.4fr) minmax(150px, 1fr) minmax(
+      110px,
+      0.65fr
+    ) minmax(130px, 0.8fr);
+  gap: 12px;
+  align-items: start;
+  padding: 16px;
+  margin-bottom: 16px;
+  border: 1px solid #e5ebe2;
+  border-radius: 12px;
+  background: #f6f8f3;
+}
+.order-filters .ant-select {
+  width: 100%;
+}
+.order-filters .ant-checkbox-wrapper {
+  grid-column: 1 / -1;
+}
+.ant-table-tbody > tr.order-overdue > td {
+  background: #fff2e6;
+}
+.ant-table-tbody > tr.order-overdue > td:first-child {
+  box-shadow: inset 3px 0 #d7672b;
+}
+.order-actions {
+  margin-top: 20px;
+}
+.order-conflict {
+  margin-bottom: 14px;
+}
+.order-history {
+  margin-top: 30px;
+}
+.order-history h2 {
+  font-size: 21px;
+  margin: 0 0 18px;
+}
+.history-entry {
+  display: grid;
+  gap: 4px;
+}
+.history-entry span {
+  color: #52645a;
+}
+.history-entry p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.order-description {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.order-loading {
+  padding: 70px 0;
+  text-align: center;
+}
+@media (max-width: 1010px) {
+  .order-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 490px) {
+  .order-filters {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

@@ -222,7 +222,6 @@ pnpm --dir web lint
 | Vardiyada ekip filtresi (MWFM-29) | Personelin güncel ekibine göre çalışır. Geçmiş ekip üyeliği saklanmadığı için vardiya tarihindeki ekip üyeliğini göstermez. |
 | Puantaj takvimi | Resmî tatil verisi 2026–2027 ile sınırlıdır. |
 | Rotasyon | Greedy planlama kullanılır; her durumda en iyi planı bulma garantisi yoktur. |
-| Mevcut kapsam | İş emri ekranları henüz eklenmemiştir. |
 
 ## Durdurma ve sorun giderme
 

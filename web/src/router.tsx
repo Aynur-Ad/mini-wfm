@@ -1,3 +1,5 @@
+import { WorkOrdersPage } from "./pages/work-orders-page";
+import { WorkOrderDetailPage } from "./pages/work-order-detail-page";
 import { LoginPage } from "./pages/login-page";
 import { RequireSession } from "./components/require-session";
 import { createBrowserRouter, Navigate } from "react-router-dom";
@@ -37,6 +39,8 @@ export const router = createBrowserRouter([
             path: "workforce-users/:id",
             element: <WorkforceUserDetailPage />,
           },
+          { path: "work-orders", element: <WorkOrdersPage /> },
+          { path: "work-orders/:id", element: <WorkOrderDetailPage /> },
           {
             path: "*",
             element: <NotFoundPage />,
