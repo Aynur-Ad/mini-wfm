@@ -9,17 +9,25 @@ const priorityColors: Record<Priority, string> = {
   URGENT: "volcano",
 };
 const statusColors: Record<Status, string> = {
-  OPEN: "default",
-  ASSIGNED: "green",
+  OPEN: "blue",
+  ASSIGNED: "cyan",
   IN_PROGRESS: "orange",
-  COMPLETED: "success",
+  COMPLETED: "green",
   CANCELLED: "default",
 };
 
 export function PriorityTag({ priority }: { priority: Priority }) {
-  return <Tag color={priorityColors[priority]}>{priorityLabels[priority]}</Tag>;
+  return (
+    <Tag className="order-chip" color={priorityColors[priority]}>
+      {priorityLabels[priority]}
+    </Tag>
+  );
 }
 
 export function StatusTag({ status }: { status: Status }) {
-  return <Tag color={statusColors[status]}>{statusLabels[status]}</Tag>;
+  return (
+    <Tag className="order-chip" color={statusColors[status]}>
+      {statusLabels[status]}
+    </Tag>
+  );
 }

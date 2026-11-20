@@ -42,7 +42,12 @@ const columns: TableColumnsType<WorkOrderListItem> = [
       </Link>
     ),
   },
-  { title: "Başlık", dataIndex: "title", key: "title" },
+  {
+    title: "Başlık",
+    dataIndex: "title",
+    key: "title",
+    className: "order-title-cell",
+  },
   {
     title: "Öncelik",
     key: "priority",
@@ -64,7 +69,11 @@ const columns: TableColumnsType<WorkOrderListItem> = [
     render: (_, row) => (
       <Space wrap>
         {displayDate(row.dueAt)}
-        {row.isOverdue && <Tag color="volcano">Gecikti</Tag>}
+        {row.isOverdue && (
+          <Tag className="order-late-tag" color="volcano">
+            Gecikti
+          </Tag>
+        )}
       </Space>
     ),
   },
@@ -95,73 +104,119 @@ export function WorkOrdersPage() {
   const updateFilters = (values: Partial<Filters>) =>
     setFilters((current) => ({ ...current, ...values, page: 1 }));
 
+  const hasFilters = Boolean(
+    search ||
+    filters.search ||
+    filters.status?.length ||
+    filters.priority ||
+    filters.teamId ||
+    filters.overdue,
+  );
+
   return (
-    <section aria-labelledby="orders-title">
+    <section className="orders-page" aria-labelledby="orders-title">
       <div className="order-heading">
         <div>
           <h1 id="orders-title">İş Emirleri</h1>
-          <p>Ekiplerin iş emirlerini ve bitiş zamanlarını takip et.</p>
+          {!orders.isError && orders.data && (
+            <p aria-live="polite">{orders.data.total} iş emri</p>
+          )}
         </div>
         {canWriteOrders(account.data?.role) && (
           <Button
             type="primary"
-            icon={<PlusOutlined />}
+            size="large"
+            icon={<PlusOutlined aria-hidden />}
             onClick={() => setCreating(true)}
           >
             Yeni İş Emri
           </Button>
         )}
       </div>
-      <div className="order-filters" aria-label="İş emri filtreleri">
-        <Input.Search
-          aria-label="İş emri ara"
-          value={search}
-          onChange={(event) => {
-            setSearch(event.target.value);
-            if (!event.target.value) updateFilters({ search: undefined });
-          }}
-          onSearch={(value) => updateFilters({ search: value.trim() })}
-          placeholder="Kod veya başlık ara"
-          allowClear
-          enterButton={<SearchOutlined />}
-        />
-        <Select
-          aria-label="Durum"
-          mode="multiple"
-          allowClear
-          placeholder="Durum"
-          options={statusOptions}
-          value={filters.status ?? []}
-          onChange={(status) => updateFilters({ status })}
-        />
-        <Select
-          aria-label="Öncelik"
-          allowClear
-          placeholder="Öncelik"
-          options={priorityOptions}
-          value={filters.priority}
-          onChange={(priority) => updateFilters({ priority })}
-        />
-        <Select
-          aria-label="Ekip"
-          loading={teams.isPending}
-          showSearch
-          optionFilterProp="label"
-          allowClear
-          placeholder="Ekip"
-          options={teams.data?.map(({ id, name }) => ({
-            value: id,
-            label: name,
-          }))}
-          value={filters.teamId}
-          onChange={(teamId) => updateFilters({ teamId })}
-        />
-        <Checkbox
-          checked={Boolean(filters.overdue)}
-          onChange={(event) => updateFilters({ overdue: event.target.checked })}
-        >
-          Yalnızca gecikenler
-        </Checkbox>
+      <div
+        className="order-filters"
+        role="group"
+        aria-label="İş emri filtreleri"
+      >
+        <div className="filter-field">
+          <label htmlFor="orders-search">Ara</label>
+          <Input.Search
+            id="orders-search"
+            aria-label="İş emri ara"
+            value={search}
+            onChange={(event) => {
+              setSearch(event.target.value);
+              if (!event.target.value) updateFilters({ search: undefined });
+            }}
+            onSearch={(value) => updateFilters({ search: value.trim() })}
+            placeholder="Kod veya başlık ara"
+            allowClear
+            enterButton={<SearchOutlined aria-label="Ara" />}
+          />
+        </div>
+        <div className="filter-field">
+          <label htmlFor="orders-status">Durum</label>
+          <Select
+            id="orders-status"
+            aria-label="Durum"
+            mode="multiple"
+            allowClear
+            placeholder="Tümü"
+            options={statusOptions}
+            value={filters.status ?? []}
+            onChange={(status) => updateFilters({ status })}
+          />
+        </div>
+        <div className="filter-field">
+          <label htmlFor="orders-priority">Öncelik</label>
+          <Select
+            id="orders-priority"
+            aria-label="Öncelik"
+            allowClear
+            placeholder="Tümü"
+            options={priorityOptions}
+            value={filters.priority}
+            onChange={(priority) => updateFilters({ priority })}
+          />
+        </div>
+        <div className="filter-field">
+          <label htmlFor="orders-team">Ekip</label>
+          <Select
+            id="orders-team"
+            aria-label="Ekip"
+            loading={teams.isPending}
+            showSearch
+            optionFilterProp="label"
+            allowClear
+            placeholder="Tümü"
+            options={teams.data?.map(({ id, name }) => ({
+              value: id,
+              label: name,
+            }))}
+            value={filters.teamId}
+            onChange={(teamId) => updateFilters({ teamId })}
+          />
+        </div>
+        <div className="filter-footer">
+          <Checkbox
+            checked={Boolean(filters.overdue)}
+            onChange={(event) =>
+              updateFilters({ overdue: event.target.checked })
+            }
+          >
+            Yalnızca gecikenler
+          </Checkbox>
+          {hasFilters && (
+            <Button
+              onClick={() => {
+                setSearch("");
+                setFilters(({ limit }) => ({ page: 1, limit }));
+              }}
+            >
+              Filtreleri temizle
+            </Button>
+          )}
+        </div>
       </div>
       {teams.isError && (
         <Alert
@@ -180,6 +235,7 @@ export function WorkOrdersPage() {
         />
       ) : (
         <Table<WorkOrderListItem>
+          className="orders-table"
           rowKey="id"
           columns={columns}
           dataSource={orders.data?.data}
