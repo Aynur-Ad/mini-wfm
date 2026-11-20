@@ -9,7 +9,6 @@ import {
   Space,
   Spin,
   Tag,
-  Typography,
 } from "antd";
 import {
   ArrowLeftOutlined,
@@ -89,7 +88,7 @@ export function WorkforceUserDetailPage() {
 
   const fullName = `${person.firstName} ${person.lastName}`;
   return (
-    <div>
+    <section aria-labelledby="person-detail-title">
       <Breadcrumb
         style={{ marginBottom: 16 }}
         items={[
@@ -97,20 +96,9 @@ export function WorkforceUserDetailPage() {
           { title: fullName },
         ]}
       />
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          flexWrap: "wrap",
-          gap: 16,
-          marginBottom: 16,
-        }}
-      >
-        <Typography.Title level={3} style={{ margin: 0 }}>
-          {fullName}
-        </Typography.Title>
-        <Space>
+      <header className="workspace-page-heading detail-heading">
+        <h1 id="person-detail-title">{fullName}</h1>
+        <Space wrap>
           {back}
           {canManagePeople && (
             <Button
@@ -122,7 +110,7 @@ export function WorkforceUserDetailPage() {
             </Button>
           )}
         </Space>
-      </div>
+      </header>
       <Descriptions
         bordered
         column={1}
@@ -167,6 +155,6 @@ export function WorkforceUserDetailPage() {
           onClose={() => setModalOpen(false)}
         />
       )}
-    </div>
+    </section>
   );
 }

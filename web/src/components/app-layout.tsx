@@ -1,6 +1,6 @@
-import { Button, Layout, Menu, Tag } from "antd";
+import { Button, Layout, Menu } from "antd";
 import {
-  BranchesOutlined,
+  ThunderboltFilled,
   ScheduleOutlined,
   LogoutOutlined,
   TeamOutlined,
@@ -36,19 +36,20 @@ export function AppLayout() {
   return (
     <Layout className="workspace-layout">
       <Sider
-        width={216}
+        width={232}
         breakpoint="md"
-        collapsedWidth={58}
+        collapsedWidth={64}
         className="workspace-sider"
       >
-        <div className="brand">
-          <span className="brand-icon">
-            <BranchesOutlined />
+        <div className="brand" aria-label="Mini WFM">
+          <span className="brand-icon" aria-hidden="true">
+            <TeamOutlined />
+            <ThunderboltFilled className="brand-energy" />
           </span>
           <span className="brand-name">Mini WFM</span>
         </div>
         <Menu
-          theme="dark"
+          className="workspace-menu"
           mode="inline"
           selectedKeys={activePage ? [activePage.key] : []}
           items={menuItems}
@@ -57,14 +58,22 @@ export function AppLayout() {
       </Sider>
       <Layout className="workspace-main">
         <Header className="workspace-header">
-          <span className="workspace-section">
-            {activePage?.label ?? "Mini WFM"}
-          </span>
           {user && (
             <div className="workspace-account">
-              <span className="workspace-username">{user.username}</span>
-              <Tag color="green">{roleLabels[user.role]}</Tag>
-              <Button icon={<LogoutOutlined />} onClick={logout}>
+              <div className="account-identity">
+                <span className="account-avatar" aria-hidden>
+                  <UserOutlined />
+                </span>
+                <span className="account-details">
+                  <span className="workspace-username">{user.username}</span>
+                  <span className="account-role">{roleLabels[user.role]}</span>
+                </span>
+              </div>
+              <Button
+                className="logout-button"
+                icon={<LogoutOutlined aria-hidden />}
+                onClick={logout}
+              >
                 Çıkış
               </Button>
             </div>

@@ -81,20 +81,21 @@ describe("Giriş ve korumalı adres", () => {
   });
   it("yasak işlem mesajını gösterir ve oturumu korur", async () => {
     setAccessToken("viewer-token");
-    const notify = vi.spyOn(message, "error");
-    try {
-      const response = http.get("/accounts", {
-        adapter: async (config) => {
-          const error = new AxiosError("403", "ERR_BAD_REQUEST", config);
-          Object.assign(error, { response: { status: 403, data: {} } });
-          throw error;
-        },
-      });
-      await expect(response).rejects.toThrow("403");
-      expect(notify).toHaveBeenCalledWith("Bu işlem için yetkiniz yok");
-      expect(getAccessToken()).toBe("viewer-token");
-    } finally {
-      message.destroy();
-    }
+    const closed = Promise.resolve(true);
+    const notify = vi
+      .spyOn(message, "error")
+      .mockReturnValue(
+        Object.assign(vi.fn(), { then: closed.then.bind(closed) }),
+      );
+    const response = http.get("/accounts", {
+      adapter: async (config) => {
+        const error = new AxiosError("403", "ERR_BAD_REQUEST", config);
+        Object.assign(error, { response: { status: 403, data: {} } });
+        throw error;
+      },
+    });
+    await expect(response).rejects.toThrow("403");
+    expect(notify).toHaveBeenCalledWith("Bu işlem için yetkiniz yok");
+    expect(getAccessToken()).toBe("viewer-token");
   });
 });

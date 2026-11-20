@@ -12,7 +12,6 @@ import {
   Switch,
   Table,
   Tag,
-  Typography,
   message,
 } from "antd";
 import type { TableColumnsType } from "antd";
@@ -26,8 +25,6 @@ import dayjs from "dayjs";
 import { TeamFormModal } from "../components/team-form-modal";
 import { useDeleteTeam, useTeams, useUpdateTeam } from "../hooks/use-teams";
 import type { Team } from "../types";
-
-const { Title } = Typography;
 
 export function TeamsPage() {
   const { canManagePeople } = useSession();
@@ -196,52 +193,53 @@ export function TeamsPage() {
   ];
 
   return (
-    <div>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 16,
-        }}
-      >
-        <Title level={3} style={{ margin: 0 }}>
-          Ekipler
-        </Title>
+    <section className="workspace-list-page" aria-labelledby="team-list-title">
+      <header className="workspace-page-heading">
+        <h1 id="team-list-title">Ekipler</h1>
         {canManagePeople && (
           <Button
             type="primary"
-            icon={<PlusOutlined />}
+            size="large"
+            icon={<PlusOutlined aria-hidden />}
             onClick={handleOpenCreateModal}
           >
             Yeni Ekip
           </Button>
         )}
+      </header>
+      <div
+        className="workspace-filters directory-filters"
+        role="group"
+        aria-label="Ekip filtreleri"
+      >
+        <div className="filter-field">
+          <label htmlFor="team-list-search">Ara</label>
+          <Input
+            id="team-list-search"
+            placeholder="Ekip adı ara..."
+            prefix={<SearchOutlined />}
+            allowClear
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+          />
+        </div>
+        <div className="filter-field">
+          <label htmlFor="team-list-status">Durum</label>
+          <Select
+            id="team-list-status"
+            value={statusFilter}
+            onChange={(value: "all" | "active" | "passive") => {
+              setStatusFilter(value);
+              setPage(1);
+            }}
+            options={[
+              { label: "Tümü", value: "all" },
+              { label: "Aktif", value: "active" },
+              { label: "Pasif", value: "passive" },
+            ]}
+          />
+        </div>
       </div>
-
-      <Space style={{ marginBottom: 16 }} wrap>
-        <Input
-          placeholder="Ekip adı ara..."
-          prefix={<SearchOutlined />}
-          allowClear
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-          style={{ width: 260 }}
-        />
-        <Select
-          value={statusFilter}
-          onChange={(value: "all" | "active" | "passive") => {
-            setStatusFilter(value);
-            setPage(1);
-          }}
-          style={{ width: 160 }}
-          options={[
-            { label: "Tümü", value: "all" },
-            { label: "Aktif", value: "active" },
-            { label: "Pasif", value: "passive" },
-          ]}
-        />
-      </Space>
 
       {isError ? (
         <Alert
@@ -271,6 +269,7 @@ export function TeamsPage() {
           dataSource={data?.data ?? []}
           loading={isFetching}
           locale={{ emptyText: "Kayıt bulunamadı" }}
+          scroll={{ x: 720 }}
           pagination={{
             current: page,
             pageSize: limit,
@@ -296,6 +295,6 @@ export function TeamsPage() {
           onClose={handleCloseModal}
         />
       )}
-    </div>
+    </section>
   );
 }
