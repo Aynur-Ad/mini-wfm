@@ -10,7 +10,6 @@ import {
   Space,
   Spin,
   Tag,
-  Typography,
 } from "antd";
 import {
   ArrowLeftOutlined,
@@ -22,8 +21,6 @@ import dayjs from "dayjs";
 import { TeamFormModal } from "../components/team-form-modal";
 import { useTeam } from "../hooks/use-teams";
 import { TeamMembersPanel } from "../components/team-members-panel";
-
-const { Title } = Typography;
 
 export function TeamDetailPage() {
   const { canManagePeople } = useSession();
@@ -99,8 +96,7 @@ export function TeamDetailPage() {
   if (!team) return null;
 
   return (
-    <div>
-      {/* Üst Gezinme Yolu: Ekipler / {ekip adı} */}
+    <section aria-labelledby="team-detail-title">
       <Breadcrumb
         style={{ marginBottom: 16 }}
         items={[
@@ -113,18 +109,8 @@ export function TeamDetailPage() {
         ]}
       />
 
-      {/* Başlık ve Düzenle Butonu */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 16,
-        }}
-      >
-        <Title level={3} style={{ margin: 0 }}>
-          {team.name}
-        </Title>
+      <header className="workspace-page-heading detail-heading">
+        <h1 id="team-detail-title">{team.name}</h1>
         {canManagePeople && (
           <Button
             type="primary"
@@ -134,9 +120,8 @@ export function TeamDetailPage() {
             Düzenle
           </Button>
         )}
-      </div>
+      </header>
 
-      {/* Ekip Detay Bilgileri */}
       <Descriptions
         bordered
         column={1}
@@ -186,6 +171,6 @@ export function TeamDetailPage() {
           onClose={() => setIsEditModalOpen(false)}
         />
       )}
-    </div>
+    </section>
   );
 }

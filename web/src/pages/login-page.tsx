@@ -3,7 +3,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Alert, Button, Form, Input } from "antd";
 import {
   ArrowRightOutlined,
-  AppstoreOutlined,
+  TeamOutlined,
+  ThunderboltFilled,
   CalendarOutlined,
   CheckOutlined,
   LockOutlined,
@@ -70,8 +71,9 @@ export function LoginPage() {
     <main className="login-screen">
       <section className="login-cover" aria-label="Mini WFM">
         <div className="brand">
-          <span className="brand-icon">
-            <AppstoreOutlined aria-hidden />
+          <span className="brand-icon" aria-hidden="true">
+            <TeamOutlined />
+            <ThunderboltFilled className="brand-energy" />
           </span>{" "}
           Mini WFM
         </div>

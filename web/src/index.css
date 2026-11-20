@@ -6,7 +6,6 @@
   --green-900: #174638;
   --blue-100: #ecf4fa;
   --ink-muted: #586b65;
-  --line: #e0e9e5;
   --warm-white: #fffdf9;
   --card-shadow: 0 1px 2px #173e3010, 0 12px 28px #2347390b;
 }
@@ -34,20 +33,37 @@ body {
   white-space: nowrap;
 }
 .brand-icon {
+  position: relative;
   display: grid;
   place-items: center;
   width: 40px;
   height: 40px;
   flex: 0 0 40px;
-  color: #743410;
-  background: linear-gradient(150deg, #ffd8b6, #f7aa75);
-  border: 1px solid #ffdabd;
+  color: #f6fff8;
+  background: linear-gradient(150deg, #378367, #174a3c);
+  border: 1px solid #439778;
   border-radius: 13px;
   box-shadow:
-    inset 0 1px 0 #fff7,
-    0 2px 0 #b76b42,
-    0 4px 8px #42231216;
-  font-size: 18px;
+    inset 0 1px 0 #ffffff3d,
+    0 2px 0 #123c31,
+    0 4px 8px #184d342e;
+  font-size: 22px;
+}
+.brand-icon .anticon-team {
+  transform: translate(-2px, -2px);
+}
+.brand-icon .brand-energy {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  background: #ffc18d;
+  color: #753810;
+  border-radius: 5px;
+  font-size: 11px;
 }
 
 .ant-btn:not(.ant-btn-text, .ant-btn-link, :disabled, .ant-btn-loading) {
@@ -232,8 +248,8 @@ body {
   min-height: 100vh;
 }
 .workspace-layout .workspace-sider {
-  background: #fafffc;
-  border-right: 1px solid #dce9e2;
+  background: linear-gradient(165deg, #e3f3e9, #deeee9 58%, #dcecf3);
+  border-right: 1px solid #c6dfd7;
 }
 .workspace-sider .brand {
   height: 78px;
@@ -260,7 +276,8 @@ body {
 .workspace-main {
   min-width: 0;
   background:
-    radial-gradient(ellipse at 95% 3%, #e5f1f7, transparent 60%), #f5f7f2;
+    radial-gradient(ellipse at 100% 0%, #beddf2, transparent 65%),
+    linear-gradient(150deg, #e1eff7, #dfeee5);
 }
 .workspace-main .workspace-header {
   min-height: 70px;
@@ -269,8 +286,8 @@ body {
   display: flex;
   justify-content: flex-end;
   align-items: center;
-  background: #fffefa;
-  border-bottom: 1px solid var(--line);
+  background: linear-gradient(110deg, #e0f0eb, #d2e8f7);
+  border-bottom: 1px solid #ccdfeb;
   line-height: 1.25;
 }
 .workspace-account {
@@ -316,20 +333,29 @@ body {
   min-width: 0;
   margin: clamp(12px, 3vw, 32px);
   padding: clamp(14px, 3vw, 32px);
-  background: var(--warm-white);
-  border: 1px solid var(--line);
+  background: linear-gradient(155deg, #eff8fd, #eaf5ee 60%, #f5f8ed);
+  border: 1px solid #d4e5e6;
   border-radius: 21px;
   box-shadow: var(--card-shadow);
 }
-.order-heading {
+.workspace-page-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 14px;
   flex-wrap: wrap;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
+  padding: clamp(12px, 2.2vw, 23px);
+  background: linear-gradient(106deg, #d9eee3, #e1eff9);
+  border: 1px solid #cfe4e6;
+  border-inline-start: 4px solid #cd7950;
+  border-radius: 14px;
 }
-.order-heading h1 {
+.workspace-list-page > .workspace-page-heading .ant-btn {
+  min-height: 44px;
+  padding-inline: 18px;
+}
+.workspace-page-heading h1 {
   margin: 0;
   font-size: clamp(26px, 3.1vw, 40px);
   line-height: 1.15;
@@ -337,13 +363,11 @@ body {
   color: var(--green-900);
   overflow-wrap: anywhere;
 }
-.order-heading p {
-  margin: 6px 0 0;
-  color: var(--ink-muted);
-  font-size: 14px;
-}
-.order-detail-heading {
+.detail-heading {
   margin-top: 18px;
+}
+.detail-heading h1 {
+  font-size: clamp(23px, 2.8vw, 34px);
 }
 .order-code {
   color: #235f86;
@@ -358,19 +382,21 @@ body {
   font-size: 13px;
   margin-bottom: 8px;
 }
-.order-filters {
+.workspace-filters {
   display: grid;
-  grid-template-columns: minmax(180px, 1.5fr) minmax(125px, 1fr) minmax(
-      96px,
-      0.75fr
-    ) minmax(100px, 1fr);
+  grid-template-columns:
+    minmax(180px, 1.5fr) minmax(125px, 1fr) minmax(96px, 0.75fr)
+    minmax(100px, 1fr);
   align-items: start;
   gap: 12px 14px;
   padding: 17px 18px 13px;
   margin-bottom: 20px;
-  background: linear-gradient(125deg, #f3f8f5, #eef5fa);
-  border: 1px solid #dce9e7;
+  background: linear-gradient(120deg, #dfedf8, #e0f1e9);
+  border: 1px solid #c9dfe8;
   border-radius: 15px;
+}
+.workspace-filters.directory-filters {
+  grid-template-columns: minmax(180px, 2fr) minmax(125px, 1fr);
 }
 .filter-field {
   display: grid;
@@ -398,15 +424,51 @@ body {
   height: 32px;
   background: white;
 }
-.orders-page > .ant-alert {
+.workspace-list-page > .ant-alert {
   margin-bottom: 16px;
 }
-.orders-table .ant-table-container {
-  border: 1px solid #e2ebe8;
+.workspace-content .ant-table-container {
+  border: 1px solid #cfdee6;
   border-radius: 14px;
   overflow: hidden;
 }
-.orders-table .order-title-cell {
+.workspace-content .ant-table-thead > tr > th {
+  background: #dbeaf5;
+}
+.workspace-content
+  .ant-table-tbody
+  > tr:not(.ant-table-placeholder, .order-overdue):nth-child(odd)
+  > td {
+  background: #f7fbfd;
+}
+.workspace-content
+  .ant-table-tbody
+  > tr:not(.ant-table-placeholder, .order-overdue):nth-child(even)
+  > td {
+  background: #eef7f2;
+}
+.workspace-content
+  .ant-table-tbody
+  > tr:not(.ant-table-placeholder, .order-overdue):hover
+  > td {
+  background: #e3f1f9;
+}
+.workspace-content .ant-descriptions {
+  background: #f6fafd;
+  border-radius: 14px;
+}
+.workspace-content .ant-descriptions .ant-descriptions-item-label {
+  background: #deedf6;
+}
+.workspace-content .ant-descriptions .ant-descriptions-item-content {
+  background: #f1f8f3;
+}
+.workspace-content .ant-descriptions .ant-descriptions-view {
+  border-color: #cddfe7;
+  border-radius: 14px;
+  overflow: hidden;
+}
+.workspace-content .order-title-cell {
   font-weight: 650;
 }
 .order-chip,
@@ -416,7 +478,7 @@ body {
   font-weight: 600;
 }
 .ant-table-tbody > tr.order-overdue > td {
-  background: #fff1e5;
+  background: #ffe9d8;
 }
 .ant-table-tbody > tr.order-overdue > td:first-child {
   box-shadow: inset 3px 0 #c96636;
@@ -428,7 +490,11 @@ body {
   margin-bottom: 14px;
 }
 .order-history {
-  margin-top: 30px;
+  margin-top: 26px;
+  padding: clamp(15px, 3vw, 26px);
+  background: linear-gradient(125deg, #deedf8, #e7f3eb);
+  border: 1px solid #cee3e7;
+  border-radius: 15px;
 }
 .order-history h2 {
   font-size: 21px;
@@ -455,7 +521,7 @@ body {
 }
 
 @media (max-width: 1060px) {
-  .order-filters {
+  .workspace-filters {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -493,7 +559,8 @@ body {
     padding: 12px;
     border-radius: 14px;
   }
-  .order-filters {
+  .workspace-filters,
+  .workspace-filters.directory-filters {
     grid-template-columns: minmax(0, 1fr);
     padding: 12px;
   }

@@ -1,6 +1,6 @@
 import { Button, Layout, Menu } from "antd";
 import {
-  AppstoreOutlined,
+  ThunderboltFilled,
   ScheduleOutlined,
   LogoutOutlined,
   TeamOutlined,
@@ -42,8 +42,9 @@ export function AppLayout() {
         className="workspace-sider"
       >
         <div className="brand" aria-label="Mini WFM">
-          <span className="brand-icon">
-            <AppstoreOutlined aria-hidden />
+          <span className="brand-icon" aria-hidden="true">
+            <TeamOutlined />
+            <ThunderboltFilled className="brand-energy" />
           </span>
           <span className="brand-name">Mini WFM</span>
         </div>

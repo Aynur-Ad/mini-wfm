@@ -11,7 +11,6 @@ import {
   Switch,
   Table,
   Tag,
-  Typography,
   message,
 } from "antd";
 import type { TableColumnsType } from "antd";
@@ -242,55 +241,62 @@ export function WorkforceUsersPage() {
         ? "active"
         : "passive";
   return (
-    <div>
+    <section
+      className="workspace-list-page"
+      aria-labelledby="people-list-title"
+    >
       {contextHolder}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          gap: 16,
-          flexWrap: "wrap",
-          marginBottom: 16,
-        }}
-      >
-        <Typography.Title level={3} style={{ margin: 0 }}>
-          Personeller
-        </Typography.Title>
+      <header className="workspace-page-heading">
+        <h1 id="people-list-title">Personeller</h1>
         {canManagePeople && (
-          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+          <Button
+            type="primary"
+            size="large"
+            icon={<PlusOutlined aria-hidden />}
+            onClick={openCreate}
+          >
             Yeni Personel
           </Button>
         )}
+      </header>
+      <div
+        className="workspace-filters directory-filters"
+        role="group"
+        aria-label="Personel filtreleri"
+      >
+        <div className="filter-field">
+          <label htmlFor="people-list-search">Ara</label>
+          <Input
+            id="people-list-search"
+            aria-label="Personel ara"
+            placeholder="Ad, soyad veya sicil numarası ara..."
+            prefix={<SearchOutlined />}
+            allowClear
+            value={searchInput}
+            onChange={(event) => setSearchInput(event.target.value)}
+          />
+        </div>
+        <div className="filter-field">
+          <label htmlFor="people-list-status">Durum</label>
+          <Select
+            id="people-list-status"
+            aria-label="Personel durumu"
+            value={status}
+            options={[
+              { value: "all", label: "Tümü" },
+              { value: "active", label: "Aktif" },
+              { value: "passive", label: "Pasif" },
+            ]}
+            onChange={(value: "all" | "active" | "passive") =>
+              setParams((current) => ({
+                ...current,
+                page: 1,
+                isActive: value === "all" ? undefined : value === "active",
+              }))
+            }
+          />
+        </div>
       </div>
-      <Space wrap style={{ marginBottom: 16 }}>
-        <Input
-          aria-label="Personel ara"
-          placeholder="Ad, soyad veya sicil numarası ara..."
-          prefix={<SearchOutlined />}
-          allowClear
-          value={searchInput}
-          onChange={(event) => setSearchInput(event.target.value)}
-          style={{ width: 320, maxWidth: "100%" }}
-        />
-        <Select
-          aria-label="Personel durumu"
-          value={status}
-          style={{ width: 160 }}
-          options={[
-            { value: "all", label: "Tümü" },
-            { value: "active", label: "Aktif" },
-            { value: "passive", label: "Pasif" },
-          ]}
-          onChange={(value: "all" | "active" | "passive") =>
-            setParams((current) => ({
-              ...current,
-              page: 1,
-              isActive: value === "all" ? undefined : value === "active",
-            }))
-          }
-        />
-      </Space>
       {isError ? (
         <Alert
           type="error"
@@ -342,6 +348,6 @@ export function WorkforceUsersPage() {
           onSaved={() => setParams((current) => ({ ...current, page: 1 }))}
         />
       )}
-    </div>
+    </section>
   );
 }

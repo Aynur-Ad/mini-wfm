@@ -114,14 +114,9 @@ export function WorkOrdersPage() {
   );
 
   return (
-    <section className="orders-page" aria-labelledby="orders-title">
-      <div className="order-heading">
-        <div>
-          <h1 id="orders-title">İş Emirleri</h1>
-          {!orders.isError && orders.data && (
-            <p aria-live="polite">{orders.data.total} iş emri</p>
-          )}
-        </div>
+    <section className="workspace-list-page" aria-labelledby="orders-title">
+      <header className="workspace-page-heading">
+        <h1 id="orders-title">İş Emirleri</h1>
         {canWriteOrders(account.data?.role) && (
           <Button
             type="primary"
@@ -132,9 +127,9 @@ export function WorkOrdersPage() {
             Yeni İş Emri
           </Button>
         )}
-      </div>
+      </header>
       <div
-        className="order-filters"
+        className="workspace-filters"
         role="group"
         aria-label="İş emri filtreleri"
       >
@@ -235,7 +230,6 @@ export function WorkOrdersPage() {
         />
       ) : (
         <Table<WorkOrderListItem>
-          className="orders-table"
           rowKey="id"
           columns={columns}
           dataSource={orders.data?.data}
