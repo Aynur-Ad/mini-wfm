@@ -1,5 +1,6 @@
 import { Controller } from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
+import type { WorkforceImportRow } from './workforce_users.service.js';
 import { WorkforceUsersService } from './workforce_users.service.js';
 import { CreateWorkforceUserDto } from './dto/create-workforce_user.dto.js';
 import { QueryWorkforceUsersDto } from './dto/query-workforce_users.dto.js';
@@ -14,6 +15,11 @@ export class WorkforceUsersController {
     return this.workforceUsersService.create(createWorkforceUserDto);
   }
 
+  @MessagePattern('importWorkforceUsers')
+  importCsv(@Payload() rows: WorkforceImportRow[]) {
+    return this.workforceUsersService.importCsv(rows);
+  }
+
   @MessagePattern('findAllWorkforceUsers')
   findAll(@Payload() queryWorkforceUsersDto: QueryWorkforceUsersDto) {
     return this.workforceUsersService.findAll(queryWorkforceUsersDto);
@@ -26,7 +32,10 @@ export class WorkforceUsersController {
 
   @MessagePattern('updateWorkforceUser')
   update(@Payload() updateWorkforceUserDto: UpdateWorkforceUserDto) {
-    return this.workforceUsersService.update(updateWorkforceUserDto.id, updateWorkforceUserDto);
+    return this.workforceUsersService.update(
+      updateWorkforceUserDto.id,
+      updateWorkforceUserDto,
+    );
   }
 
   @MessagePattern('removeWorkforceUser')

@@ -1,3 +1,4 @@
+import { WorkforceImportModal } from "../components/workforce-import-modal";
 import { useTranslation } from "../i18n/language";
 import { useSession } from "../auth/use-session";
 import { useEffect, useState } from "react";
@@ -18,6 +19,7 @@ import type { TableColumnsType } from "antd";
 import {
   DeleteOutlined,
   EditOutlined,
+  UploadOutlined,
   PlusOutlined,
   SearchOutlined,
 } from "@ant-design/icons";
@@ -136,6 +138,7 @@ export function WorkforceUsersPage() {
   const [messageApi, contextHolder] = message.useMessage();
   const [params, setParams] = useState<ListParams>({ page: 1, limit: 10 });
   const [searchInput, setSearchInput] = useState("");
+  const [importOpen, setImportOpen] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingPerson, setEditingPerson] = useState<WorkforceUser | null>(
     null,
@@ -255,14 +258,24 @@ export function WorkforceUsersPage() {
       <header className="workspace-page-heading">
         <h1 id="people-list-title">{t("Personeller")}</h1>
         {canManagePeople && (
-          <Button
-            type="primary"
-            size="large"
-            icon={<PlusOutlined aria-hidden />}
-            onClick={openCreate}
-          >
-            {t("Yeni Personel")}
-          </Button>
+          <Space wrap>
+            <Button
+              className="csv-import-trigger"
+              size="large"
+              icon={<UploadOutlined aria-hidden />}
+              onClick={() => setImportOpen(true)}
+            >
+              {t("CSV içe aktar")}
+            </Button>
+            <Button
+              type="primary"
+              size="large"
+              icon={<PlusOutlined aria-hidden />}
+              onClick={openCreate}
+            >
+              {t("Yeni Personel")}
+            </Button>
+          </Space>
         )}
       </header>
       <div
@@ -345,6 +358,9 @@ export function WorkforceUsersPage() {
               })),
           }}
         />
+      )}
+      {canManagePeople && importOpen && (
+        <WorkforceImportModal onClose={() => setImportOpen(false)} />
       )}
       {canManagePeople && (
         <WorkforceUserFormModal

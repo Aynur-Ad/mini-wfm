@@ -370,6 +370,58 @@ describe('HTTP rol izinleri — gerçek global guard ve controller akışı', ()
     vi.unstubAllEnvs();
   });
 
+  it.each([AccountRole.ADMIN, AccountRole.PLANNER, AccountRole.VIEWER])(
+    'CSV yükleme rol denetimi: %s',
+    async (role) => {
+      const result = await request(app.getHttpServer())
+        .post('/api/workforce-users/import')
+        .set('Authorization', `Bearer ${tokens.get(role)}`)
+        .attach(
+          'file',
+          Buffer.from('firstName,lastName,registrationNumber\nCan,Kaya,0007'),
+          'personel.csv',
+        );
+      expect(result.status).toBe(role === AccountRole.ADMIN ? 201 : 403);
+      if (role === AccountRole.ADMIN) {
+        expect(send).toHaveBeenCalledWith(
+          'importWorkforceUsers',
+          expect.objectContaining({
+            actor: users.get(role),
+            data: [
+              {
+                row: 2,
+                person: {
+                  firstName: 'Can',
+                  lastName: 'Kaya',
+                  registrationNumber: '0007',
+                  phone: null,
+                },
+              },
+            ],
+          }),
+        );
+      } else expect(send).not.toHaveBeenCalled();
+    },
+  );
+
+  it('geçersiz CSV satırında TCP isteği göndermez', async () => {
+    const result = await request(app.getHttpServer())
+      .post('/api/workforce-users/import')
+      .set('Authorization', `Bearer ${tokens.get(AccountRole.ADMIN)}`)
+      .attach(
+        'file',
+        Buffer.from(
+          'firstName,lastName,registrationNumber,phone\nCan,Kaya,0007,123',
+        ),
+        'personel.csv',
+      );
+    expect(result.status).toBe(400);
+    expect(result.body).toMatchObject({
+      details: [{ row: 2, messages: [expect.stringContaining('10 haneli')] }],
+    });
+    expect(send).not.toHaveBeenCalled();
+  });
+
   describe.each(allRoles)('%s', (role) => {
     it.each(routes)('$method $path', async (route) => {
       const allowed = (route.roles as readonly AccountRole[]).includes(role);
