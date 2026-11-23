@@ -1,4 +1,8 @@
+import { readMailSettings } from '../mail/mail-settings.js';
+import type { MailSettings } from '../mail/mail-settings.js';
+
 export interface Environment {
+  MAIL: MailSettings | null;
   RABBITMQ_URL: string;
   RABBITMQ_QUEUE: string;
   NOTIFICATION_HOST: string;
@@ -67,5 +71,5 @@ export function validateEnvironment(
     errors.push('RABBITMQ_QUEUE: geçersiz kuyruk adı');
   if (errors.length)
     throw new Error(`Ortam ayarları geçersiz:\n${errors.join('\n')}`);
-  return result as unknown as Environment;
+  return { ...result, MAIL: readMailSettings(input) } as unknown as Environment;
 }
