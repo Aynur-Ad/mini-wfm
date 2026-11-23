@@ -5,12 +5,12 @@ import { RouterProvider } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ConfigProvider } from "antd";
 import trTR from "antd/locale/tr_TR";
-import dayjs from "dayjs";
-import "dayjs/locale/tr";
+import enGB from "antd/locale/en_GB";
+import { applyLanguage, getLanguage, useLanguage } from "./i18n/language";
 import { router } from "./router";
 import "./index.css";
 
-dayjs.locale("tr");
+applyLanguage(getLanguage());
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -21,11 +21,12 @@ const queryClient = new QueryClient({
   },
 });
 
-ReactDOM.createRoot(document.getElementById("root")!).render(
-  <React.StrictMode>
+export function App() {
+  const language = useLanguage();
+  return (
     <QueryClientProvider client={queryClient}>
       <ConfigProvider
-        locale={trTR}
+        locale={language === "en" ? enGB : trTR}
         theme={{
           token: {
             colorPrimary: "#ba4d20",
@@ -60,5 +61,11 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         <RouterProvider router={router} />
       </ConfigProvider>
     </QueryClientProvider>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")!).render(
+  <React.StrictMode>
+    <App />
   </React.StrictMode>,
 );

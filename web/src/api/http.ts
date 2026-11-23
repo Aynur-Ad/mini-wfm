@@ -1,3 +1,5 @@
+import { getLanguage } from "../i18n/language";
+import { translator } from "../i18n/messages";
 import axios, { isAxiosError, isCancel } from "axios";
 import { message } from "antd";
 import type { ApiErrorResponse } from "../types";
@@ -5,7 +7,7 @@ import { getAccessToken, setAccessToken } from "../auth/session";
 
 export function apiErrorMessage(
   error: unknown,
-  fallback = "Sunucuya ulaşılamıyor",
+  fallback = translator(getLanguage())("Sunucuya ulaşılamıyor"),
 ) {
   if (!isAxiosError<ApiErrorResponse>(error)) return fallback;
   const value = error.response?.data?.message;
@@ -39,7 +41,9 @@ http.interceptors.response.use(
       )
         setAccessToken(null);
     } else if (error.response?.status === 403) {
-      void message.error("Bu işlem için yetkiniz yok");
+      void message.error(
+        translator(getLanguage())("Bu işlem için yetkiniz yok"),
+      );
     } else {
       void message.error(apiErrorMessage(error));
     }

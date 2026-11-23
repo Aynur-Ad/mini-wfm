@@ -1,3 +1,4 @@
+import { dateTimeFormat, useTranslation } from "../i18n/language";
 import { useSession } from "../auth/use-session";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
@@ -22,6 +23,7 @@ import { useWorkforceUser } from "../hooks/use-workforce-users";
 import { formatPhone } from "../utils/format-phone";
 
 export function WorkforceUserDetailPage() {
+  const t = useTranslation();
   const { canManagePeople } = useSession();
   const { id } = useParams<{ id: string }>();
   const [modalOpen, setModalOpen] = useState(false);
@@ -40,7 +42,7 @@ export function WorkforceUserDetailPage() {
     !isValidId || (isAxiosError(error) && error.response?.status === 404);
   const back = (
     <Link to="/workforce-users">
-      <Button icon={<ArrowLeftOutlined />}>Listeye dön</Button>
+      <Button icon={<ArrowLeftOutlined />}>{t("Listeye dön")}</Button>
     </Link>
   );
 
@@ -48,8 +50,8 @@ export function WorkforceUserDetailPage() {
     return (
       <Result
         status="404"
-        title="Personel bulunamadı"
-        subTitle="Aradığınız personel mevcut değil veya silinmiş olabilir."
+        title={t("Personel bulunamadı")}
+        subTitle={t("Aradığınız personel mevcut değil veya silinmiş olabilir.")}
         extra={back}
       />
     );
@@ -57,7 +59,7 @@ export function WorkforceUserDetailPage() {
   if (isLoading) {
     return (
       <div style={{ display: "flex", justifyContent: "center", padding: 64 }}>
-        <Spin size="large" aria-label="Personel yükleniyor" />
+        <Spin size="large" aria-label={t("Personel yükleniyor")} />
       </div>
     );
   }
@@ -65,8 +67,8 @@ export function WorkforceUserDetailPage() {
     return (
       <Result
         status="error"
-        title="Personel bilgileri yüklenemedi"
-        subTitle="Sunucu bağlantısını kontrol edip yeniden deneyin."
+        title={t("Personel bilgileri yüklenemedi")}
+        subTitle={t("Sunucu bağlantısını kontrol edip yeniden deneyin.")}
         extra={
           <Space>
             {back}
@@ -77,7 +79,7 @@ export function WorkforceUserDetailPage() {
                 void refetch();
               }}
             >
-              Yeniden dene
+              {t("Yeniden dene")}
             </Button>
           </Space>
         }
@@ -92,7 +94,7 @@ export function WorkforceUserDetailPage() {
       <Breadcrumb
         style={{ marginBottom: 16 }}
         items={[
-          { title: <Link to="/workforce-users">Personeller</Link> },
+          { title: <Link to="/workforce-users">{t("Personeller")}</Link> },
           { title: fullName },
         ]}
       />
@@ -106,7 +108,7 @@ export function WorkforceUserDetailPage() {
               icon={<EditOutlined />}
               onClick={() => setModalOpen(true)}
             >
-              Düzenle
+              {t("Düzenle")}
             </Button>
           )}
         </Space>
@@ -117,34 +119,34 @@ export function WorkforceUserDetailPage() {
         items={[
           {
             key: "registrationNumber",
-            label: "Sicil No",
+            label: t("Sicil No"),
             children: person.registrationNumber,
           },
-          { key: "firstName", label: "Ad", children: person.firstName },
-          { key: "lastName", label: "Soyad", children: person.lastName },
+          { key: "firstName", label: t("Ad"), children: person.firstName },
+          { key: "lastName", label: t("Soyad"), children: person.lastName },
           {
             key: "phone",
-            label: "Telefon",
+            label: t("Telefon"),
             children: formatPhone(person.phone),
           },
           {
             key: "isActive",
-            label: "Durum",
+            label: t("Durum"),
             children: (
               <Tag color={person.isActive ? "green" : "default"}>
-                {person.isActive ? "Aktif" : "Pasif"}
+                {person.isActive ? t("Aktif") : t("Pasif")}
               </Tag>
             ),
           },
           {
             key: "createdAt",
-            label: "Oluşturulma",
-            children: dayjs(person.createdAt).format("DD.MM.YYYY HH:mm"),
+            label: t("Oluşturulma"),
+            children: dayjs(person.createdAt).format(dateTimeFormat()),
           },
           {
             key: "updatedAt",
-            label: "Son Güncelleme",
-            children: dayjs(person.updatedAt).format("DD.MM.YYYY HH:mm"),
+            label: t("Son Güncelleme"),
+            children: dayjs(person.updatedAt).format(dateTimeFormat()),
           },
         ]}
       />

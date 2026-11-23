@@ -1,3 +1,5 @@
+import type { Translator } from "../i18n/messages";
+import { useTranslation } from "../i18n/language";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -32,54 +34,57 @@ import {
 } from "../work-orders/work-orders";
 import type { Filters, WorkOrderListItem } from "../work-orders/work-orders";
 
-const columns: TableColumnsType<WorkOrderListItem> = [
-  {
-    title: "Kod",
-    key: "code",
-    render: (_, row) => (
-      <Link className="order-code" to={`/work-orders/${row.id}`}>
-        {row.code}
-      </Link>
-    ),
-  },
-  {
-    title: "Başlık",
-    dataIndex: "title",
-    key: "title",
-    className: "order-title-cell",
-  },
-  {
-    title: "Öncelik",
-    key: "priority",
-    render: (_, row) => <PriorityTag priority={row.priority} />,
-  },
-  {
-    title: "Durum",
-    key: "status",
-    render: (_, row) => <StatusTag status={row.status} />,
-  },
-  {
-    title: "Ekip",
-    key: "team",
-    render: (_, row) => row.team?.name ?? "Atanmamış",
-  },
-  {
-    title: "Bitiş zamanı",
-    key: "dueAt",
-    render: (_, row) => (
-      <Space wrap>
-        {displayDate(row.dueAt)}
-        {row.isOverdue && (
-          <Tag className="order-late-tag" color="volcano">
-            Gecikti
-          </Tag>
-        )}
-      </Space>
-    ),
-  },
-];
+function getColumns(t: Translator): TableColumnsType<WorkOrderListItem> {
+  return [
+    {
+      title: t("Kod"),
+      key: "code",
+      render: (_, row) => (
+        <Link className="order-code" to={`/work-orders/${row.id}`}>
+          {row.code}
+        </Link>
+      ),
+    },
+    {
+      title: t("Başlık"),
+      dataIndex: "title",
+      key: "title",
+      className: "order-title-cell",
+    },
+    {
+      title: t("Öncelik"),
+      key: "priority",
+      render: (_, row) => <PriorityTag priority={row.priority} />,
+    },
+    {
+      title: t("Durum"),
+      key: "status",
+      render: (_, row) => <StatusTag status={row.status} />,
+    },
+    {
+      title: t("Ekip"),
+      key: "team",
+      render: (_, row) => row.team?.name ?? t("Atanmamış"),
+    },
+    {
+      title: t("Bitiş zamanı"),
+      key: "dueAt",
+      render: (_, row) => (
+        <Space wrap>
+          {displayDate(row.dueAt)}
+          {row.isOverdue && (
+            <Tag className="order-late-tag" color="volcano">
+              {t("Gecikti")}
+            </Tag>
+          )}
+        </Space>
+      ),
+    },
+  ];
+}
 
 export function WorkOrdersPage() {
+  const t = useTranslation();
   const navigate = useNavigate();
   const client = useQueryClient();
   const { account } = useSession();
@@ -116,7 +121,7 @@ export function WorkOrdersPage() {
   return (
     <section className="workspace-list-page" aria-labelledby="orders-title">
       <header className="workspace-page-heading">
-        <h1 id="orders-title">İş Emirleri</h1>
+        <h1 id="orders-title">{t("İş Emirleri")}</h1>
         {canWriteOrders(account.data?.role) && (
           <Button
             type="primary"
@@ -124,66 +129,66 @@ export function WorkOrdersPage() {
             icon={<PlusOutlined aria-hidden />}
             onClick={() => setCreating(true)}
           >
-            Yeni İş Emri
+            {t("Yeni İş Emri")}
           </Button>
         )}
       </header>
       <div
         className="workspace-filters"
         role="group"
-        aria-label="İş emri filtreleri"
+        aria-label={t("İş emri filtreleri")}
       >
         <div className="filter-field">
-          <label htmlFor="orders-search">Ara</label>
+          <label htmlFor="orders-search">{t("Ara")}</label>
           <Input.Search
             id="orders-search"
-            aria-label="İş emri ara"
+            aria-label={t("İş emri ara")}
             value={search}
             onChange={(event) => {
               setSearch(event.target.value);
               if (!event.target.value) updateFilters({ search: undefined });
             }}
             onSearch={(value) => updateFilters({ search: value.trim() })}
-            placeholder="Kod veya başlık ara"
+            placeholder={t("Kod veya başlık ara")}
             allowClear
-            enterButton={<SearchOutlined aria-label="Ara" />}
+            enterButton={<SearchOutlined aria-label={t("Ara")} />}
           />
         </div>
         <div className="filter-field">
-          <label htmlFor="orders-status">Durum</label>
+          <label htmlFor="orders-status">{t("Durum")}</label>
           <Select
             id="orders-status"
-            aria-label="Durum"
+            aria-label={t("Durum")}
             mode="multiple"
             allowClear
-            placeholder="Tümü"
-            options={statusOptions}
+            placeholder={t("Tümü")}
+            options={statusOptions(t)}
             value={filters.status ?? []}
             onChange={(status) => updateFilters({ status })}
           />
         </div>
         <div className="filter-field">
-          <label htmlFor="orders-priority">Öncelik</label>
+          <label htmlFor="orders-priority">{t("Öncelik")}</label>
           <Select
             id="orders-priority"
-            aria-label="Öncelik"
+            aria-label={t("Öncelik")}
             allowClear
-            placeholder="Tümü"
-            options={priorityOptions}
+            placeholder={t("Tümü")}
+            options={priorityOptions(t)}
             value={filters.priority}
             onChange={(priority) => updateFilters({ priority })}
           />
         </div>
         <div className="filter-field">
-          <label htmlFor="orders-team">Ekip</label>
+          <label htmlFor="orders-team">{t("Ekip")}</label>
           <Select
             id="orders-team"
-            aria-label="Ekip"
+            aria-label={t("Ekip")}
             loading={teams.isPending}
             showSearch
             optionFilterProp="label"
             allowClear
-            placeholder="Tümü"
+            placeholder={t("Tümü")}
             options={teams.data?.map(({ id, name }) => ({
               value: id,
               label: name,
@@ -199,7 +204,7 @@ export function WorkOrdersPage() {
               updateFilters({ overdue: event.target.checked })
             }
           >
-            Yalnızca gecikenler
+            {t("Yalnızca gecikenler")}
           </Checkbox>
           {hasFilters && (
             <Button
@@ -208,7 +213,7 @@ export function WorkOrdersPage() {
                 setFilters(({ limit }) => ({ page: 1, limit }));
               }}
             >
-              Filtreleri temizle
+              {t("Filtreleri temizle")}
             </Button>
           )}
         </div>
@@ -217,26 +222,30 @@ export function WorkOrdersPage() {
         <Alert
           type="warning"
           showIcon
-          title="Ekip filtresi yüklenemedi"
-          action={<Button onClick={() => void teams.refetch()}>Yenile</Button>}
+          title={t("Ekip filtresi yüklenemedi")}
+          action={
+            <Button onClick={() => void teams.refetch()}>{t("Yenile")}</Button>
+          }
         />
       )}
       {orders.isError ? (
         <Alert
           type="error"
           showIcon
-          title="İş emirleri yüklenemedi"
-          action={<Button onClick={() => void orders.refetch()}>Yenile</Button>}
+          title={t("İş emirleri yüklenemedi")}
+          action={
+            <Button onClick={() => void orders.refetch()}>{t("Yenile")}</Button>
+          }
         />
       ) : (
         <Table<WorkOrderListItem>
           rowKey="id"
-          columns={columns}
+          columns={getColumns(t)}
           dataSource={orders.data?.data}
           loading={orders.isFetching}
           rowClassName={(row) => (row.isOverdue ? "order-overdue" : "")}
           scroll={{ x: 850 }}
-          locale={{ emptyText: "Bu filtrelere uyan iş emri yok." }}
+          locale={{ emptyText: t("Bu filtrelere uyan iş emri yok.") }}
           pagination={{
             current: filters.page,
             pageSize: filters.limit,

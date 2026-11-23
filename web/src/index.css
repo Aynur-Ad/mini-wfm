@@ -574,3 +574,18 @@ body {
 .logout-button .anticon {
   color: #2d6887;
 }
+
+.login-form-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  margin-bottom: 29px;
+}
+.login-form-heading h1 {
+  margin: 0;
+}
+.workspace-account {
+  flex-wrap: wrap;
+}

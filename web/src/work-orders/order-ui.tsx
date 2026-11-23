@@ -1,3 +1,4 @@
+import { useTranslation } from "../i18n/language";
 import { Tag } from "antd";
 import { priorityLabels, statusLabels } from "./work-orders";
 import type { Priority, Status } from "./work-orders";
@@ -17,17 +18,19 @@ const statusColors: Record<Status, string> = {
 };
 
 export function PriorityTag({ priority }: { priority: Priority }) {
+  const t = useTranslation();
   return (
     <Tag className="order-chip" color={priorityColors[priority]}>
-      {priorityLabels[priority]}
+      {t(priorityLabels[priority])}
     </Tag>
   );
 }
 
 export function StatusTag({ status }: { status: Status }) {
+  const t = useTranslation();
   return (
     <Tag className="order-chip" color={statusColors[status]}>
-      {statusLabels[status]}
+      {t(statusLabels[status])}
     </Tag>
   );
 }

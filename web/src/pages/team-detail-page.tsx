@@ -1,3 +1,4 @@
+import { dateTimeFormat, useTranslation } from "../i18n/language";
 // web/src/pages/team-detail-page.tsx
 import { useSession } from "../auth/use-session";
 import { useState } from "react";
@@ -23,6 +24,7 @@ import { useTeam } from "../hooks/use-teams";
 import { TeamMembersPanel } from "../components/team-members-panel";
 
 export function TeamDetailPage() {
+  const t = useTranslation();
   const { canManagePeople } = useSession();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -55,15 +57,15 @@ export function TeamDetailPage() {
     return (
       <Result
         status="404"
-        title="Ekip bulunamadı"
-        subTitle="Aradığınız ekip mevcut değil veya silinmiş olabilir."
+        title={t("Ekip bulunamadı")}
+        subTitle={t("Aradığınız ekip mevcut değil veya silinmiş olabilir.")}
         extra={
           <Button
             type="primary"
             icon={<ArrowLeftOutlined />}
             onClick={() => navigate("/teams")}
           >
-            Listeye dön
+            {t("Listeye dön")}
           </Button>
         }
       />
@@ -74,11 +76,13 @@ export function TeamDetailPage() {
     return (
       <Result
         status="error"
-        title="Ekip bilgileri yüklenemedi"
-        subTitle="Sunucu bağlantısını kontrol edip yeniden deneyin."
+        title={t("Ekip bilgileri yüklenemedi")}
+        subTitle={t("Sunucu bağlantısını kontrol edip yeniden deneyin.")}
         extra={
           <Space>
-            <Button onClick={() => navigate("/teams")}>Listeye dön</Button>
+            <Button onClick={() => navigate("/teams")}>
+              {t("Listeye dön")}
+            </Button>
             <Button
               type="primary"
               icon={<ReloadOutlined />}
@@ -86,7 +90,7 @@ export function TeamDetailPage() {
                 void refetch();
               }}
             >
-              Yeniden dene
+              {t("Yeniden dene")}
             </Button>
           </Space>
         }
@@ -101,7 +105,7 @@ export function TeamDetailPage() {
         style={{ marginBottom: 16 }}
         items={[
           {
-            title: <Link to="/teams">Ekipler</Link>,
+            title: <Link to="/teams">{t("Ekipler")}</Link>,
           },
           {
             title: team.name,
@@ -117,7 +121,7 @@ export function TeamDetailPage() {
             icon={<EditOutlined />}
             onClick={() => setIsEditModalOpen(true)}
           >
-            Düzenle
+            {t("Düzenle")}
           </Button>
         )}
       </header>
@@ -128,12 +132,12 @@ export function TeamDetailPage() {
         items={[
           {
             key: "name",
-            label: "Ad",
+            label: t("Ad"),
             children: team.name,
           },
           {
             key: "description",
-            label: "Açıklama",
+            label: t("Açıklama"),
             children:
               team.description && team.description.trim() !== ""
                 ? team.description
@@ -141,22 +145,22 @@ export function TeamDetailPage() {
           },
           {
             key: "isActive",
-            label: "Durum",
+            label: t("Durum"),
             children: team.isActive ? (
-              <Tag color="green">Aktif</Tag>
+              <Tag color="green">{t("Aktif")}</Tag>
             ) : (
-              <Tag color="default">Pasif</Tag>
+              <Tag color="default">{t("Pasif")}</Tag>
             ),
           },
           {
             key: "createdAt",
-            label: "Oluşturulma",
-            children: dayjs(team.createdAt).format("DD.MM.YYYY HH:mm"),
+            label: t("Oluşturulma"),
+            children: dayjs(team.createdAt).format(dateTimeFormat()),
           },
           {
             key: "updatedAt",
-            label: "Son Güncelleme",
-            children: dayjs(team.updatedAt).format("DD.MM.YYYY HH:mm"),
+            label: t("Son Güncelleme"),
+            children: dayjs(team.updatedAt).format(dateTimeFormat()),
           },
         ]}
       />
