@@ -1,3 +1,4 @@
+import { useTranslation } from "../i18n/language";
 import { useEffect, useRef, useState } from "react";
 import { Alert, Button, Input, Modal, Table, Tag, Typography } from "antd";
 import type { TableColumnsType } from "antd";
@@ -18,6 +19,7 @@ export function AddTeamMemberModal({
   onClose,
   onAdded,
 }: AddTeamMemberModalProps) {
+  const t = useTranslation();
   const [search, setSearch] = useState("");
   const [params, setParams] = useState<QueryWorkforceUsersParams>({
     page: 1,
@@ -44,10 +46,12 @@ export function AddTeamMemberModal({
   const unavailableReason = (person: WorkforceUser) => {
     if (person.teamId !== null) {
       return person.teamId === team.id
-        ? "Zaten bu ekibin üyesi"
-        : `${person.team?.name ?? `Ekip #${person.teamId}`} ekibine atanmış`;
+        ? t("Zaten bu ekibin üyesi")
+        : t("{team} ekibine atanmış", {
+            team: person.team?.name ?? t("Ekip #{id}", { id: person.teamId }),
+          });
     }
-    return person.isActive ? undefined : "Personel pasif";
+    return person.isActive ? undefined : t("Personel pasif");
   };
   const selected = data?.data.find((person) => person.id === selectedId);
   const canSubmit =
@@ -78,33 +82,33 @@ export function AddTeamMemberModal({
 
   const columns: TableColumnsType<WorkforceUser> = [
     {
-      title: "Sicil No",
+      title: t("Sicil No"),
       dataIndex: "registrationNumber",
       key: "registrationNumber",
     },
     {
-      title: "Ad Soyad",
+      title: t("Ad Soyad"),
       key: "fullName",
       render: (_value, person) => `${person.firstName} ${person.lastName}`,
     },
     {
-      title: "Ekip",
+      title: t("Ekip"),
       key: "team",
       render: (_value, person) =>
         person.teamId !== null ? (
           <Tag color={person.teamId === team.id ? "blue" : "default"}>
-            {person.team?.name ?? `Ekip #${person.teamId}`}
+            {person.team?.name ?? t("Ekip #{id}", { id: person.teamId })}
           </Tag>
         ) : (
           "—"
         ),
     },
     {
-      title: "Durum",
+      title: t("Durum"),
       key: "status",
       render: (_value, person) => (
         <Tag color={person.isActive ? "green" : "default"}>
-          {person.isActive ? "Aktif" : "Pasif"}
+          {person.isActive ? t("Aktif") : t("Pasif")}
         </Tag>
       ),
     },
@@ -112,11 +116,11 @@ export function AddTeamMemberModal({
 
   return (
     <Modal
-      title={`${team.name} — Üye Ekle`}
+      title={`${team.name} — ${t("Üye Ekle")}`}
       open
       width={760}
-      okText="Ekle"
-      cancelText="Vazgeç"
+      okText={t("Ekle")}
+      cancelText={t("Vazgeç")}
       onOk={() => {
         void submit();
       }}
@@ -131,20 +135,21 @@ export function AddTeamMemberModal({
       mask={{ closable: !mutation.isPending }}
     >
       <Typography.Paragraph type="secondary" style={{ marginTop: 16 }}>
-        Personeli ad, soyad veya sicil numarasıyla arayın. Bir ekibe atanmış
-        veya pasif personeller seçilemez.
+        {t(
+          "Personeli ad, soyad veya sicil numarasıyla arayın. Bir ekibe atanmış veya pasif personeller seçilemez.",
+        )}
       </Typography.Paragraph>
       {!team.isActive && (
         <Alert
           type="warning"
           showIcon
-          title="Pasif ekibe personel eklenemez."
+          title={t("Pasif ekibe personel eklenemez.")}
           style={{ marginBottom: 16 }}
         />
       )}
       <Input
-        aria-label="Eklenecek personeli ara"
-        placeholder="Ad, soyad veya sicil numarası..."
+        aria-label={t("Eklenecek personeli ara")}
+        placeholder={t("Ad, soyad veya sicil numarası...")}
         prefix={<SearchOutlined />}
         allowClear
         value={search}
@@ -159,14 +164,14 @@ export function AddTeamMemberModal({
         <Alert
           type="error"
           showIcon
-          title="Personel listesi yüklenemedi"
+          title={t("Personel listesi yüklenemedi")}
           action={
             <Button
               onClick={() => {
                 void refetch();
               }}
             >
-              Yeniden dene
+              {t("Yeniden dene")}
             </Button>
           }
         />
@@ -177,7 +182,7 @@ export function AddTeamMemberModal({
           columns={columns}
           dataSource={data?.data ?? []}
           loading={isFetching || isSearching}
-          locale={{ emptyText: "Aramaya uygun personel bulunamadı" }}
+          locale={{ emptyText: t("Aramaya uygun personel bulunamadı") }}
           scroll={{ x: 580 }}
           rowSelection={{
             type: "radio",
@@ -193,7 +198,9 @@ export function AddTeamMemberModal({
                 mutation.isPending ||
                 isSearching,
               title: unavailableReason(person),
-              "aria-label": `${person.firstName} ${person.lastName} seç`,
+              "aria-label": t("{name} seç", {
+                name: `${person.firstName} ${person.lastName}`,
+              }),
             }),
           }}
           pagination={{

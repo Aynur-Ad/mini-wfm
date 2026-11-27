@@ -1,3 +1,4 @@
+import { useTranslation } from "../i18n/language";
 // web/src/components/team-form-modal.tsx
 import { useEffect } from "react";
 import { Form, Input, Modal, message } from "antd";
@@ -11,6 +12,7 @@ interface TeamFormModalProps {
 }
 
 export function TeamFormModal({ open, team, onClose }: TeamFormModalProps) {
+  const t = useTranslation();
   const [form] = Form.useForm<CreateTeamDto>();
   const createTeamMutation = useCreateTeam();
   const updateTeamMutation = useUpdateTeam();
@@ -48,10 +50,10 @@ export function TeamFormModal({ open, team, onClose }: TeamFormModalProps) {
           id: team.id,
           payload,
         });
-        message.success("Ekip başarıyla güncellendi");
+        message.success(t("Ekip başarıyla güncellendi"));
       } else {
         await createTeamMutation.mutateAsync(payload);
-        message.success("Ekip başarıyla oluşturuldu");
+        message.success(t("Ekip başarıyla oluşturuldu"));
       }
 
       // 3. Başarılıysa formu temizle ve modal'ı kapat (Hata olursa buraya geçmez, modal açık kalır)
@@ -69,12 +71,12 @@ export function TeamFormModal({ open, team, onClose }: TeamFormModalProps) {
 
   return (
     <Modal
-      title={isEditing ? "Ekibi Düzenle" : "Yeni Ekip"}
+      title={isEditing ? t("Ekibi Düzenle") : t("Yeni Ekip")}
       open={open}
       onOk={handleSubmit}
       onCancel={handleCancel}
-      okText="Kaydet"
-      cancelText="İptal"
+      okText={t("Kaydet")}
+      cancelText={t("İptal")}
       confirmLoading={isSubmitting}
       mask={{ closable: !isSubmitting }}
       destroyOnHidden
@@ -86,31 +88,31 @@ export function TeamFormModal({ open, team, onClose }: TeamFormModalProps) {
         style={{ marginTop: 16 }}
       >
         <Form.Item
-          label="Ekip Adı"
+          label={t("Ekip Adı")}
           name="name"
           rules={[
             {
               required: true,
               whitespace: true,
-              message: "Ekip adı boş bırakılamaz",
+              message: t("Ekip adı boş bırakılamaz"),
             },
             {
               max: 200,
-              message: "Ekip adı en fazla 200 karakter olabilir",
+              message: t("Ekip adı en fazla 200 karakter olabilir"),
             },
           ]}
         >
           <Input
-            placeholder="Örn: Backend Geliştirme Ekibi"
+            placeholder={t("Örn: Backend Geliştirme Ekibi")}
             maxLength={200}
             showCount
           />
         </Form.Item>
 
-        <Form.Item label="Açıklama" name="description">
+        <Form.Item label={t("Açıklama")} name="description">
           <Input.TextArea
             rows={4}
-            placeholder="Ekibin görev tanımı ve açıklaması (opsiyonel)"
+            placeholder={t("Ekibin görev tanımı ve açıklaması (opsiyonel)")}
           />
         </Form.Item>
       </Form>

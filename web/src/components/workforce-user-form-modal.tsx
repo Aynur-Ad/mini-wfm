@@ -1,3 +1,4 @@
+import { useTranslation } from "../i18n/language";
 import { useEffect, useRef } from "react";
 import { Form, Input, Modal, message } from "antd";
 import {
@@ -29,6 +30,7 @@ export function WorkforceUserFormModal({
   onClose,
   onSaved,
 }: WorkforceUserFormModalProps) {
+  const t = useTranslation();
   const [form] = Form.useForm<FormValues>();
   const [messageApi, contextHolder] = message.useMessage();
   const createMutation = useCreateWorkforceUser();
@@ -62,10 +64,10 @@ export function WorkforceUserFormModal({
     try {
       if (person) {
         await updateMutation.mutateAsync({ id: person.id, payload });
-        void messageApi.success("Personel başarıyla güncellendi");
+        void messageApi.success(t("Personel başarıyla güncellendi"));
       } else {
         await createMutation.mutateAsync(payload);
-        void messageApi.success("Personel başarıyla oluşturuldu");
+        void messageApi.success(t("Personel başarıyla oluşturuldu"));
       }
       form.resetFields();
       onSaved?.();
@@ -87,12 +89,12 @@ export function WorkforceUserFormModal({
     <>
       {contextHolder}
       <Modal
-        title={person ? "Personeli Düzenle" : "Yeni Personel"}
+        title={person ? t("Personeli Düzenle") : t("Yeni Personel")}
         open={open}
         onOk={() => form.submit()}
         onCancel={handleClose}
-        okText="Kaydet"
-        cancelText="İptal"
+        okText={t("Kaydet")}
+        cancelText={t("İptal")}
         confirmLoading={isSubmitting}
         cancelButtonProps={{ disabled: isSubmitting }}
         closable={!isSubmitting}
@@ -111,18 +113,18 @@ export function WorkforceUserFormModal({
           style={{ marginTop: 16 }}
         >
           <Form.Item
-            label="Ad"
+            label={t("Ad")}
             name="firstName"
             rules={[
               {
                 required: true,
                 whitespace: true,
-                message: "Ad boş bırakılamaz",
+                message: t("Ad boş bırakılamaz"),
               },
               {
                 max: 100,
                 transform: trimText,
-                message: "Ad en fazla 100 karakter olabilir",
+                message: t("Ad en fazla 100 karakter olabilir"),
               },
             ]}
           >
@@ -134,49 +136,51 @@ export function WorkforceUserFormModal({
             />
           </Form.Item>
           <Form.Item
-            label="Soyad"
+            label={t("Soyad")}
             name="lastName"
             rules={[
               {
                 required: true,
                 whitespace: true,
-                message: "Soyad boş bırakılamaz",
+                message: t("Soyad boş bırakılamaz"),
               },
               {
                 max: 100,
                 transform: trimText,
-                message: "Soyad en fazla 100 karakter olabilir",
+                message: t("Soyad en fazla 100 karakter olabilir"),
               },
             ]}
           >
             <Input autoComplete="family-name" maxLength={100} showCount />
           </Form.Item>
           <Form.Item
-            label="Sicil No"
+            label={t("Sicil No")}
             name="registrationNumber"
             rules={[
               {
                 required: true,
                 whitespace: true,
-                message: "Sicil numarası boş bırakılamaz",
+                message: t("Sicil numarası boş bırakılamaz"),
               },
               {
                 max: 20,
                 transform: trimText,
-                message: "Sicil numarası en fazla 20 karakter olabilir",
+                message: t("Sicil numarası en fazla 20 karakter olabilir"),
               },
             ]}
           >
             <Input maxLength={20} showCount autoComplete="off" />
           </Form.Item>
           <Form.Item
-            label="Telefon"
+            label={t("Telefon")}
             name="phone"
-            extra="İsteğe bağlı. Başında 0 olmadan, 5 ile başlayan 10 rakam girin."
+            extra={t(
+              "İsteğe bağlı. Başında 0 olmadan, 5 ile başlayan 10 rakam girin.",
+            )}
             rules={[
               {
                 pattern: /^5[0-9]{9}$/,
-                message: "Telefon 10 rakam olmalı ve 5 ile başlamalıdır",
+                message: t("Telefon 10 rakam olmalı ve 5 ile başlamalıdır"),
               },
             ]}
           >

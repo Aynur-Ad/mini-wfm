@@ -1,3 +1,5 @@
+import type { MessageKey, Translator } from "../i18n/messages";
+import { dateTimeFormat } from "../i18n/language";
 import dayjs from "dayjs";
 import type { AccountRole } from "../auth/use-session";
 
@@ -59,7 +61,7 @@ export interface Filters {
   overdue?: boolean;
 }
 
-export const actionLabels: Record<Status, string> = {
+export const actionLabels: Record<Status, MessageKey> = {
   OPEN: "Atamayı kaldır",
   ASSIGNED: "Ata",
   IN_PROGRESS: "Çalışmayı başlat",
@@ -101,13 +103,17 @@ export function filtersToParams(filters: Filters) {
   return params;
 }
 
-export const priorityOptions = (Object.keys(priorityLabels) as Priority[]).map(
-  (value) => ({ value, label: priorityLabels[value] }),
-);
-export const statusOptions = (Object.keys(statusLabels) as Status[]).map(
-  (value) => ({ value, label: statusLabels[value] }),
-);
+export const priorityOptions = (t: Translator) =>
+  (Object.keys(priorityLabels) as Priority[]).map((value) => ({
+    value,
+    label: t(priorityLabels[value]),
+  }));
+export const statusOptions = (t: Translator) =>
+  (Object.keys(statusLabels) as Status[]).map((value) => ({
+    value,
+    label: t(statusLabels[value]),
+  }));
 
 export function displayDate(value: string) {
-  return dayjs(value).format("DD.MM.YYYY HH:mm");
+  return dayjs(value).format(dateTimeFormat());
 }

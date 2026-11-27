@@ -1,8 +1,16 @@
+import { AccountRole } from '../accounts/account-role.js';
+import { requestContext } from '../common/logging/request-context.js';
 import { Shift } from '../shifts/entities/shift.entity.js';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
 import { InjectRepository } from '@nestjs/typeorm';
-import { FindOptionsWhere, ILike, QueryFailedError, Repository } from 'typeorm';
+import {
+  FindOptionsWhere,
+  ILike,
+  In,
+  QueryFailedError,
+  Repository,
+} from 'typeorm';
 import { CreateWorkforceUserDto } from './dto/create-workforce_user.dto.js';
 import { QueryWorkforceUsersDto } from './dto/query-workforce_users.dto.js';
 import { UpdateWorkforceUserDto } from './dto/update-workforce_user.dto.js';
@@ -22,6 +30,11 @@ const personSelect = {
   updatedAt: true,
   team: { id: true, name: true },
 } as const;
+
+export interface WorkforceImportRow {
+  row: number;
+  person: CreateWorkforceUserDto;
+}
 
 @Injectable()
 export class WorkforceUsersService {
@@ -57,6 +70,88 @@ export class WorkforceUsersService {
     });
 
     return this.saveWorkforceUser(newWorkforceUser);
+  }
+
+  async importCsv(rows: WorkforceImportRow[]): Promise<{ imported: number }> {
+    if (requestContext.getStore()?.actor?.role !== AccountRole.ADMIN) {
+      throw new RpcException({
+        statusCode: HttpStatus.FORBIDDEN,
+        message: 'Bu işlem için yetkiniz yok',
+      });
+    }
+    if (!Array.isArray(rows) || rows.length < 1 || rows.length > 500) {
+      throw new RpcException({
+        statusCode: HttpStatus.BAD_REQUEST,
+        message: 'CSV 1 ile 500 arasında personel satırı içermelidir.',
+      });
+    }
+
+    const occurrences = new Map<string, number>();
+    for (const { person } of rows) {
+      occurrences.set(
+        person.registrationNumber,
+        (occurrences.get(person.registrationNumber) ?? 0) + 1,
+      );
+    }
+
+    try {
+      return await this.workforceUserRepository.manager.transaction(
+        async (manager) => {
+          const repository = manager.getRepository(WorkforceUser);
+          const existing = new Set(
+            (
+              await repository.find({
+                where: { registrationNumber: In([...occurrences.keys()]) },
+                select: { registrationNumber: true },
+              })
+            ).map(({ registrationNumber }) => registrationNumber),
+          );
+          const details = rows.flatMap(({ row, person }) => {
+            const messages = [];
+            if ((occurrences.get(person.registrationNumber) ?? 0) > 1)
+              messages.push(
+                'Bu sicil numarası dosyada birden fazla kez kullanılmış.',
+              );
+            if (existing.has(person.registrationNumber))
+              messages.push(
+                'Bu sicil numarasıyla kayıtlı bir personel zaten var.',
+              );
+            return messages.length ? [{ row, messages }] : [];
+          });
+
+          if (details.length) {
+            throw new RpcException({
+              statusCode: HttpStatus.CONFLICT,
+              message: 'CSV satırlarında sicil numarası çakışması var.',
+              details,
+            });
+          }
+
+          await repository.insert(
+            rows.map(({ person }) => ({
+              firstName: person.firstName,
+              lastName: person.lastName,
+              registrationNumber: person.registrationNumber,
+              phone: person.phone ?? null,
+              teamId: null,
+            })),
+          );
+          return { imported: rows.length };
+        },
+      );
+    } catch (error: unknown) {
+      if (
+        error instanceof QueryFailedError &&
+        error.driverError.code === '23505'
+      ) {
+        throw new RpcException({
+          statusCode: HttpStatus.CONFLICT,
+          message:
+            'Bir sicil numarası eşzamanlı işlemde kaydedildi. CSV dosyasını kontrol edin.',
+        });
+      }
+      throw error;
+    }
   }
 
   async findAll(queryWorkforceUsersDto: QueryWorkforceUsersDto = {}): Promise<{

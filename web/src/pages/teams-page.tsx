@@ -1,3 +1,4 @@
+import { dateTimeFormat, useTranslation } from "../i18n/language";
 // web/src/pages/teams-page.tsx
 import { useSession } from "../auth/use-session";
 import { useEffect, useState } from "react";
@@ -27,6 +28,7 @@ import { useDeleteTeam, useTeams, useUpdateTeam } from "../hooks/use-teams";
 import type { Team } from "../types";
 
 export function TeamsPage() {
+  const t = useTranslation();
   const { canManagePeople } = useSession();
   const [page, setPage] = useState<number>(1);
   const [limit, setLimit] = useState<number>(10);
@@ -84,7 +86,9 @@ export function TeamsPage() {
         payload: { isActive: checked },
       });
       message.success(
-        checked ? "Ekip aktif hale getirildi" : "Ekip pasif hale getirildi",
+        checked
+          ? t("Ekip aktif hale getirildi")
+          : t("Ekip pasif hale getirildi"),
       );
     } catch {
       // Hata mesajı http.ts interceptor tarafından gösterilir
@@ -95,7 +99,7 @@ export function TeamsPage() {
   const handleDeleteTeam = async (id: number) => {
     try {
       await deleteTeamMutation.mutateAsync(id);
-      message.success("Ekip başarıyla silindi");
+      message.success(t("Ekip başarıyla silindi"));
     } catch {
       // Hata mesajı http.ts interceptor tarafından gösterilir
     }
@@ -103,7 +107,7 @@ export function TeamsPage() {
 
   const columns: TableColumnsType<Team> = [
     {
-      title: "Ekip Adı",
+      title: t("Ekip Adı"),
       dataIndex: "name",
       key: "name",
       render: (name: string, record: Team) => (
@@ -111,14 +115,14 @@ export function TeamsPage() {
       ),
     },
     {
-      title: "Açıklama",
+      title: t("Açıklama"),
       dataIndex: "description",
       key: "description",
       render: (description: string | null | undefined) =>
         description && description.trim() !== "" ? description : "-",
     },
     {
-      title: "Durum",
+      title: t("Durum"),
       dataIndex: "isActive",
       key: "isActive",
       render: (isActive: boolean, record: Team) => {
@@ -138,23 +142,22 @@ export function TeamsPage() {
               />
             )}
             {isActive ? (
-              <Tag color="green">Aktif</Tag>
+              <Tag color="green">{t("Aktif")}</Tag>
             ) : (
-              <Tag color="default">Pasif</Tag>
+              <Tag color="default">{t("Pasif")}</Tag>
             )}
           </Space>
         );
       },
     },
     {
-      title: "Oluşturulma",
+      title: t("Oluşturulma"),
       dataIndex: "createdAt",
       key: "createdAt",
-      render: (createdAt: string) =>
-        dayjs(createdAt).format("DD.MM.YYYY HH:mm"),
+      render: (createdAt: string) => dayjs(createdAt).format(dateTimeFormat()),
     },
     {
-      title: "İşlemler",
+      title: t("İşlemler"),
       key: "actions",
       render: (_: unknown, record: Team) => {
         const isRowDeleting =
@@ -168,12 +171,12 @@ export function TeamsPage() {
               icon={<EditOutlined />}
               onClick={() => handleOpenEditModal(record)}
             >
-              Düzenle
+              {t("Düzenle")}
             </Button>
             <Popconfirm
-              title="Ekibi silmek istediğinize emin misiniz?"
-              okText="Sil"
-              cancelText="Vazgeç"
+              title={t("Ekibi silmek istediğinize emin misiniz?")}
+              okText={t("Sil")}
+              cancelText={t("Vazgeç")}
               okButtonProps={{ danger: true, loading: isRowDeleting }}
               onConfirm={() => handleDeleteTeam(record.id)}
             >
@@ -183,7 +186,7 @@ export function TeamsPage() {
                 icon={<DeleteOutlined />}
                 loading={isRowDeleting}
               >
-                Sil
+                {t("Sil")}
               </Button>
             </Popconfirm>
           </Space>
@@ -195,7 +198,7 @@ export function TeamsPage() {
   return (
     <section className="workspace-list-page" aria-labelledby="team-list-title">
       <header className="workspace-page-heading">
-        <h1 id="team-list-title">Ekipler</h1>
+        <h1 id="team-list-title">{t("Ekipler")}</h1>
         {canManagePeople && (
           <Button
             type="primary"
@@ -203,20 +206,20 @@ export function TeamsPage() {
             icon={<PlusOutlined aria-hidden />}
             onClick={handleOpenCreateModal}
           >
-            Yeni Ekip
+            {t("Yeni Ekip")}
           </Button>
         )}
       </header>
       <div
         className="workspace-filters directory-filters"
         role="group"
-        aria-label="Ekip filtreleri"
+        aria-label={t("Ekip filtreleri")}
       >
         <div className="filter-field">
-          <label htmlFor="team-list-search">Ara</label>
+          <label htmlFor="team-list-search">{t("Ara")}</label>
           <Input
             id="team-list-search"
-            placeholder="Ekip adı ara..."
+            placeholder={t("Ekip adı ara...")}
             prefix={<SearchOutlined />}
             allowClear
             value={searchInput}
@@ -224,7 +227,7 @@ export function TeamsPage() {
           />
         </div>
         <div className="filter-field">
-          <label htmlFor="team-list-status">Durum</label>
+          <label htmlFor="team-list-status">{t("Durum")}</label>
           <Select
             id="team-list-status"
             value={statusFilter}
@@ -233,9 +236,9 @@ export function TeamsPage() {
               setPage(1);
             }}
             options={[
-              { label: "Tümü", value: "all" },
-              { label: "Aktif", value: "active" },
-              { label: "Pasif", value: "passive" },
+              { label: t("Tümü"), value: "all" },
+              { label: t("Aktif"), value: "active" },
+              { label: t("Pasif"), value: "passive" },
             ]}
           />
         </div>
@@ -245,8 +248,8 @@ export function TeamsPage() {
         <Alert
           type="error"
           showIcon
-          title="Ekip listesi yüklenemedi"
-          description="Sunucu bağlantısını kontrol edip yeniden deneyin."
+          title={t("Ekip listesi yüklenemedi")}
+          description={t("Sunucu bağlantısını kontrol edip yeniden deneyin.")}
           action={
             <Button
               loading={isFetching}
@@ -254,7 +257,7 @@ export function TeamsPage() {
                 void refetch();
               }}
             >
-              Yeniden dene
+              {t("Yeniden dene")}
             </Button>
           }
         />
@@ -268,7 +271,7 @@ export function TeamsPage() {
           }
           dataSource={data?.data ?? []}
           loading={isFetching}
-          locale={{ emptyText: "Kayıt bulunamadı" }}
+          locale={{ emptyText: t("Kayıt bulunamadı") }}
           scroll={{ x: 720 }}
           pagination={{
             current: page,

@@ -1,3 +1,5 @@
+import { LanguageSelect } from "../i18n/language-select";
+import { useTranslation } from "../i18n/language";
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Alert, Button, Form, Input } from "antd";
@@ -26,6 +28,7 @@ interface LoginResponse {
 }
 
 export function LoginPage() {
+  const t = useTranslation();
   const token = useAccessToken();
   const location = useLocation();
   const queryClient = useQueryClient();
@@ -59,7 +62,7 @@ export function LoginPage() {
       setError(
         apiErrorMessage(
           failure,
-          "Giriş yapılamadı. Bağlantıyı kontrol edip tekrar deneyin.",
+          t("Giriş yapılamadı. Bağlantıyı kontrol edip tekrar deneyin."),
         ),
       );
     } finally {
@@ -78,8 +81,8 @@ export function LoginPage() {
           Mini WFM
         </div>
         <div className="login-cover-copy">
-          <h2>İş gücü yönetimi</h2>
-          <p>Ekipler, personel ve iş emirleri bir arada.</p>
+          <h2>{t("İş gücü yönetimi")}</h2>
+          <p>{t("Ekipler, personel ve iş emirleri bir arada.")}</p>
         </div>
         <div className="login-illustration" aria-hidden="true">
           <div className="illustration-calendar">
@@ -113,7 +116,10 @@ export function LoginPage() {
       </section>
       <section className="login-content">
         <div className="login-form">
-          <h1>Giriş yap</h1>
+          <div className="login-form-heading">
+            <h1>{t("Giriş yap")}</h1>
+            <LanguageSelect />
+          </div>
           {error && (
             <Alert
               type="error"
@@ -129,12 +135,12 @@ export function LoginPage() {
           >
             <Form.Item
               name="username"
-              label="Kullanıcı adı"
+              label={t("Kullanıcı adı")}
               rules={[
                 {
                   required: true,
                   whitespace: true,
-                  message: "Kullanıcı adınızı girin.",
+                  message: t("Kullanıcı adınızı girin."),
                 },
               ]}
             >
@@ -147,8 +153,8 @@ export function LoginPage() {
             </Form.Item>
             <Form.Item
               name="password"
-              label="Şifre"
-              rules={[{ required: true, message: "Şifrenizi girin." }]}
+              label={t("Şifre")}
+              rules={[{ required: true, message: t("Şifrenizi girin.") }]}
             >
               <Input.Password
                 prefix={<LockOutlined />}
@@ -164,7 +170,7 @@ export function LoginPage() {
               loading={pending}
               icon={<ArrowRightOutlined aria-hidden />}
             >
-              Giriş yap
+              {t("Giriş yap")}
             </Button>
           </Form>
         </div>

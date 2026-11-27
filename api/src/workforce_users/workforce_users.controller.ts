@@ -1,3 +1,5 @@
+import { FileInterceptor } from '@nestjs/platform-express';
+import { MAX_CSV_BYTES, readWorkforceCsv } from './workforce-users-csv.js';
 import { QueryTimesheetDto } from './dto/query-timesheet.dto.js';
 import { TimesheetDto } from './dto/timesheet.dto.js';
 import { Roles } from '../common/decorators/roles.decorator.js';
@@ -8,6 +10,7 @@ import {
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -19,10 +22,15 @@ import {
   Patch,
   Post,
   Query,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiConflictResponse,
+  ApiBody,
+  ApiConsumes,
+  ApiPayloadTooLargeResponse,
   ApiCreatedResponse,
   ApiNoContentResponse,
   ApiNotFoundResponse,
@@ -71,6 +79,42 @@ export class WorkforceUsersController {
     @Body() dto: CreateWorkforceUserDto,
   ): Observable<WorkforceUserResponseDto> {
     return this.workforceUsersService.create(dto);
+  }
+
+  @Post('import')
+  @Roles(AccountRole.ADMIN)
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: { fileSize: MAX_CSV_BYTES, files: 1, fields: 0 },
+    }),
+  )
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['file'],
+      properties: { file: { type: 'string', format: 'binary' } },
+    },
+  })
+  @ApiOperation({
+    summary: 'CSV ile personel ekler',
+    description:
+      'İzin verilen roller: ADMIN. UTF-8, en fazla 500 satır ve 256 KB. Hata varsa hiçbir satır kaydedilmez.',
+  })
+  @ApiCreatedResponse({
+    schema: {
+      type: 'object',
+      properties: { imported: { type: 'integer', example: 2 } },
+    },
+  })
+  @ApiBadRequestResponse({ description: 'Dosya veya satır biçimi geçersiz' })
+  @ApiConflictResponse({ description: 'Sicil numarası çakışıyor' })
+  @ApiPayloadTooLargeResponse({
+    description: 'CSV dosyası 256 KB sınırını aşıyor',
+  })
+  importCsv(@UploadedFile() file?: { buffer: Buffer }) {
+    if (!file?.buffer) throw new BadRequestException('Bir CSV dosyası seçin.');
+    return this.workforceUsersService.importCsv(readWorkforceCsv(file.buffer));
   }
 
   @Get()
