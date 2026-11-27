@@ -1,3 +1,4 @@
+import { useTranslation } from "../i18n/language";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -56,16 +57,18 @@ export function WorkOrderDetailPage() {
 }
 
 function MissingOrder() {
+  const t = useTranslation();
   return (
     <Result
       status="404"
-      title="İş emri bulunamadı"
-      extra={<Link to="/work-orders">İş emirlerine dön</Link>}
+      title={t("İş emri bulunamadı")}
+      extra={<Link to="/work-orders">{t("İş emirlerine dön")}</Link>}
     />
   );
 }
 
 function OrderDetails({ id }: { id: number }) {
+  const t = useTranslation();
   const client = useQueryClient();
   const { account } = useSession();
   const [editing, setEditing] = useState<WorkOrder>();
@@ -106,7 +109,7 @@ function OrderDetails({ id }: { id: number }) {
       setConflict(
         apiErrorMessage(
           error,
-          "Kayıt değişti. Güncel veriyi yüklemek için Yenile'ye bas.",
+          t("Kayıt değişti. Güncel veriyi yüklemek için Yenile'ye bas."),
         ),
       );
     }
@@ -163,17 +166,17 @@ function OrderDetails({ id }: { id: number }) {
   if (detail.isPending)
     return (
       <div className="order-loading">
-        <Spin aria-label="İş emri yükleniyor" />
+        <Spin aria-label={t("İş emri yükleniyor")} />
       </div>
     );
   if (detail.isError && !detail.data)
     return (
       <Result
         status="error"
-        title="İş emri yüklenemedi"
+        title={t("İş emri yüklenemedi")}
         extra={
           <Button onClick={() => void refresh()} loading={reloading}>
-            Yenile
+            {t("Yenile")}
           </Button>
         }
       />
@@ -187,9 +190,9 @@ function OrderDetails({ id }: { id: number }) {
     Boolean(conflict) || edit.isPending || change.isPending || reloading;
   const teamName = (teamId: number | null) =>
     teamId === null
-      ? "Atanmamış"
+      ? t("Atanmamış")
       : (teams.data?.find((team) => team.id === teamId)?.name ??
-        `Ekip #${teamId}`);
+        t("Ekip #{id}", { id: teamId }));
 
   function openTransition(target: Status, version: number) {
     setTransition({ target, version });
@@ -199,7 +202,7 @@ function OrderDetails({ id }: { id: number }) {
     <section aria-labelledby="order-title">
       <Breadcrumb
         items={[
-          { title: <Link to="/work-orders">İş Emirleri</Link> },
+          { title: <Link to="/work-orders">{t("İş Emirleri")}</Link> },
           { title: order.code },
         ]}
       />
@@ -225,7 +228,7 @@ function OrderDetails({ id }: { id: number }) {
               loading={reloading}
               onClick={() => void refresh()}
             >
-              Yenile
+              {t("Yenile")}
             </Button>
           }
         />
@@ -234,15 +237,15 @@ function OrderDetails({ id }: { id: number }) {
         bordered
         column={1}
         items={[
-          { key: "team", label: "Ekip", children: teamName(order.teamId) },
+          { key: "team", label: t("Ekip"), children: teamName(order.teamId) },
           {
             key: "dueAt",
-            label: "Bitiş zamanı",
+            label: t("Bitiş zamanı"),
             children: displayDate(order.dueAt),
           },
           {
             key: "description",
-            label: "Açıklama",
+            label: t("Açıklama"),
             children: (
               <span className="order-description">
                 {order.description || "—"}
@@ -258,7 +261,7 @@ function OrderDetails({ id }: { id: number }) {
             disabled={locked}
             onClick={() => setEditing(order)}
           >
-            Düzenle
+            {t("Düzenle")}
           </Button>
           {actions.map((target) => (
             <Button
@@ -268,23 +271,25 @@ function OrderDetails({ id }: { id: number }) {
               danger={target === "CANCELLED"}
               onClick={() => openTransition(target, order.version)}
             >
-              {actionLabels[target]}
+              {t(actionLabels[target])}
             </Button>
           ))}
         </Space>
       )}
 
       <section className="order-history" aria-labelledby="history-title">
-        <h2 id="history-title">Durum geçmişi</h2>
+        <h2 id="history-title">{t("Durum geçmişi")}</h2>
         {history.isPending ? (
-          <Spin aria-label="Durum geçmişi yükleniyor" />
+          <Spin aria-label={t("Durum geçmişi yükleniyor")} />
         ) : history.isError ? (
           <Alert
-            title="Durum geçmişi yüklenemedi"
+            title={t("Durum geçmişi yüklenemedi")}
             type="error"
             showIcon
             action={
-              <Button onClick={() => void history.refetch()}>Yenile</Button>
+              <Button onClick={() => void history.refetch()}>
+                {t("Yenile")}
+              </Button>
             }
           />
         ) : history.data.length ? (
@@ -296,8 +301,8 @@ function OrderDetails({ id }: { id: number }) {
                 <div className="history-entry">
                   <strong>
                     {entry.fromStatus
-                      ? `${statusLabels[entry.fromStatus]} → ${statusLabels[entry.toStatus]}`
-                      : "İş emri oluşturuldu"}
+                      ? `${t(statusLabels[entry.fromStatus])} → ${t(statusLabels[entry.toStatus])}`
+                      : t("İş emri oluşturuldu")}
                   </strong>
                   <span>
                     {displayDate(entry.changedAt)} · {entry.changedBy.username}
@@ -311,7 +316,7 @@ function OrderDetails({ id }: { id: number }) {
             }))}
           />
         ) : (
-          <p>Henüz bir geçmiş kaydı yok.</p>
+          <p>{t("Henüz bir geçmiş kaydı yok.")}</p>
         )}
       </section>
 
@@ -326,9 +331,9 @@ function OrderDetails({ id }: { id: number }) {
       {transition && (
         <Modal
           open
-          title={actionLabels[transition.target]}
-          okText={actionLabels[transition.target]}
-          cancelText="Vazgeç"
+          title={t(actionLabels[transition.target])}
+          okText={t(actionLabels[transition.target])}
+          cancelText={t("Vazgeç")}
           confirmLoading={change.isPending}
           okButtonProps={{
             danger: transition.target === "CANCELLED",
@@ -363,26 +368,26 @@ function OrderDetails({ id }: { id: number }) {
               <>
                 {teams.isError && (
                   <Alert
-                    title="Ekipler yüklenemedi"
+                    title={t("Ekipler yüklenemedi")}
                     type="error"
                     action={
                       <Button onClick={() => void teams.refetch()}>
-                        Yenile
+                        {t("Yenile")}
                       </Button>
                     }
                   />
                 )}
                 <Form.Item
                   name="teamId"
-                  label="Ekip"
-                  rules={[{ required: true, message: "Bir ekip seç." }]}
+                  label={t("Ekip")}
+                  rules={[{ required: true, message: t("Bir ekip seç.") }]}
                 >
                   <Select
                     showSearch
                     optionFilterProp="label"
                     loading={teams.isPending}
-                    placeholder="Aktif ekip seç"
-                    notFoundContent="Aktif ekip bulunamadı"
+                    placeholder={t("Aktif ekip seç")}
+                    notFoundContent={t("Aktif ekip bulunamadı")}
                     options={teams.data
                       ?.filter((team) => team.isActive)
                       .map((team) => ({ value: team.id, label: team.name }))}
@@ -392,12 +397,12 @@ function OrderDetails({ id }: { id: number }) {
             ) : transition.target === "CANCELLED" ? (
               <Form.Item
                 name="reason"
-                label="İptal nedeni"
+                label={t("İptal nedeni")}
                 rules={[
                   {
                     required: true,
                     whitespace: true,
-                    message: "İptal nedeni gir.",
+                    message: t("İptal nedeni gir."),
                   },
                   { max: 500 },
                 ]}
@@ -406,9 +411,9 @@ function OrderDetails({ id }: { id: number }) {
               </Form.Item>
             ) : (
               <p>
-                İş emrinin durumu{" "}
-                <strong>{statusLabels[transition.target]}</strong> olarak
-                güncellenecek.
+                {t("İş emrinin durumu {status} olarak güncellenecek.", {
+                  status: t(statusLabels[transition.target]),
+                })}
               </p>
             )}
           </Form>

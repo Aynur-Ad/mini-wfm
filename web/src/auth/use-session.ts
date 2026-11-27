@@ -1,3 +1,4 @@
+import type { MessageKey } from "../i18n/messages";
 import { useSyncExternalStore } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { http } from "../api/http";
@@ -10,7 +11,7 @@ export interface Account {
   role: AccountRole;
 }
 
-export const roleLabels: Record<AccountRole, string> = {
+export const roleLabels: Record<AccountRole, MessageKey> = {
   ADMIN: "Yönetici",
   PLANNER: "Planlamacı",
   VIEWER: "İzleyici",

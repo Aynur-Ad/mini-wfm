@@ -1,3 +1,4 @@
+import { useTranslation } from "../i18n/language";
 import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button, Popconfirm, Table, Tooltip, Typography, message } from "antd";
@@ -17,12 +18,13 @@ function RemoveMemberButton({
   person: TeamMember;
   onRemoved: () => void;
 }) {
+  const t = useTranslation();
   const mutation = useRemoveTeamMember();
   const submitting = useRef(false);
   const disabledReason = !team.isActive
-    ? "Pasif ekipte üyelik değiştirilemez."
+    ? t("Pasif ekipte üyelik değiştirilemez.")
     : !person.isActive
-      ? "Pasif personel çıkarılamaz. Önce personeli aktif hale getirin."
+      ? t("Pasif personel çıkarılamaz. Önce personeli aktif hale getirin.")
       : undefined;
   const remove = async () => {
     if (submitting.current || disabledReason) return;
@@ -44,10 +46,12 @@ function RemoveMemberButton({
     <Tooltip title={disabledReason}>
       <span style={{ display: "inline-block" }}>
         <Popconfirm
-          title="Personel ekipten çıkarılsın mı?"
-          description={`${person.firstName} ${person.lastName} (${person.registrationNumber}) — personel kaydı silinmez.`}
-          okText="Çıkar"
-          cancelText="Vazgeç"
+          title={t("Personel ekipten çıkarılsın mı?")}
+          description={t("{name} — personel kaydı silinmez.", {
+            name: `${person.firstName} ${person.lastName} (${person.registrationNumber})`,
+          })}
+          okText={t("Çıkar")}
+          cancelText={t("Vazgeç")}
           disabled={Boolean(disabledReason) || mutation.isPending}
           okButtonProps={{ danger: true, loading: mutation.isPending }}
           cancelButtonProps={{ disabled: mutation.isPending }}
@@ -60,7 +64,7 @@ function RemoveMemberButton({
             loading={mutation.isPending}
             disabled={Boolean(disabledReason)}
           >
-            Çıkar
+            {t("Çıkar")}
           </Button>
         </Popconfirm>
       </span>
@@ -75,11 +79,12 @@ export function TeamMembersPanel({
   team: TeamDetail;
   canManage: boolean;
 }) {
+  const t = useTranslation();
   const [modalOpen, setModalOpen] = useState(false);
   const [messageApi, contextHolder] = message.useMessage();
   const columns: TableColumnsType<TeamMember> = [
     {
-      title: "Sicil No",
+      title: t("Sicil No"),
       dataIndex: "registrationNumber",
       key: "registrationNumber",
       render: (value: string, person) => (
@@ -87,25 +92,25 @@ export function TeamMembersPanel({
       ),
     },
     {
-      title: "Ad Soyad",
+      title: t("Ad Soyad"),
       key: "fullName",
       render: (_value, person) => `${person.firstName} ${person.lastName}`,
     },
     {
-      title: "Telefon",
+      title: t("Telefon"),
       dataIndex: "phone",
       key: "phone",
       render: (phone: string | null) => formatPhone(phone),
     },
     {
-      title: "İşlemler",
+      title: t("İşlemler"),
       key: "actions",
       render: (_value, person) => (
         <RemoveMemberButton
           team={team}
           person={person}
           onRemoved={() => {
-            void messageApi.success("Personel ekipten çıkarıldı");
+            void messageApi.success(t("Personel ekipten çıkarıldı"));
           }}
         />
       ),
@@ -113,7 +118,7 @@ export function TeamMembersPanel({
   ];
 
   return (
-    <section aria-label="Ekip üyeleri" style={{ marginTop: 32 }}>
+    <section aria-label={t("Ekip üyeleri")} style={{ marginTop: 32 }}>
       {contextHolder}
       <div
         style={{
@@ -126,13 +131,15 @@ export function TeamMembersPanel({
         }}
       >
         <Typography.Title level={4} style={{ margin: 0 }}>
-          Üyeler
+          {t("Üyeler")}
         </Typography.Title>
         {canManage && (
           <Tooltip
             title={
               !team.isActive
-                ? "Pasif ekibe personel eklenemez. Önce ekibi aktif hale getirin."
+                ? t(
+                    "Pasif ekibe personel eklenemez. Önce ekibi aktif hale getirin.",
+                  )
                 : undefined
             }
           >
@@ -143,7 +150,7 @@ export function TeamMembersPanel({
                 disabled={!team.isActive}
                 onClick={() => setModalOpen(true)}
               >
-                Üye Ekle
+                {t("Üye Ekle")}
               </Button>
             </span>
           </Tooltip>
@@ -155,7 +162,7 @@ export function TeamMembersPanel({
           canManage ? columns : columns.filter(({ key }) => key !== "actions")
         }
         dataSource={team.members}
-        locale={{ emptyText: "Bu ekibe henüz personel atanmamış" }}
+        locale={{ emptyText: t("Bu ekibe henüz personel atanmamış") }}
         scroll={{ x: 650 }}
         pagination={{
           pageSize: 10,
@@ -169,7 +176,7 @@ export function TeamMembersPanel({
           team={team}
           onClose={() => setModalOpen(false)}
           onAdded={() => {
-            void messageApi.success("Personel ekibe eklendi");
+            void messageApi.success(t("Personel ekibe eklendi"));
           }}
         />
       )}

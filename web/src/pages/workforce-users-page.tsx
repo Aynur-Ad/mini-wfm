@@ -1,3 +1,4 @@
+import { useTranslation } from "../i18n/language";
 import { useSession } from "../auth/use-session";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
@@ -42,6 +43,7 @@ function PersonStatus({
   person: WorkforceUser;
   onChanged: (checked: boolean) => void;
 }) {
+  const t = useTranslation();
   const mutation = useUpdateWorkforceUser();
   const toggle = async (checked: boolean) => {
     try {
@@ -59,7 +61,9 @@ function PersonStatus({
       <Space size="small">
         <Switch
           size="small"
-          aria-label={`${person.firstName} ${person.lastName} aktiflik durumu`}
+          aria-label={t("{name} aktiflik durumu", {
+            name: `${person.firstName} ${person.lastName}`,
+          })}
           checked={person.isActive}
           loading={mutation.isPending}
           onChange={(checked) => {
@@ -67,7 +71,7 @@ function PersonStatus({
           }}
         />
         <Tag color={person.isActive ? "green" : "default"}>
-          {person.isActive ? "Aktif" : "Pasif"}
+          {person.isActive ? t("Aktif") : t("Pasif")}
         </Tag>
       </Space>
     </>
@@ -83,6 +87,7 @@ function PersonActions({
   onEdit: (person: WorkforceUser) => void;
   onDeleted: () => void;
 }) {
+  const t = useTranslation();
   const mutation = useDeleteWorkforceUser();
   const remove = async () => {
     try {
@@ -101,13 +106,13 @@ function PersonActions({
           disabled={mutation.isPending}
           onClick={() => onEdit(person)}
         >
-          Düzenle
+          {t("Düzenle")}
         </Button>
         <Popconfirm
-          title="Personeli silmek istediğinize emin misiniz?"
+          title={t("Personeli silmek istediğinize emin misiniz?")}
           description={`${person.firstName} ${person.lastName} (${person.registrationNumber})`}
-          okText="Sil"
-          cancelText="Vazgeç"
+          okText={t("Sil")}
+          cancelText={t("Vazgeç")}
           okButtonProps={{ danger: true, loading: mutation.isPending }}
           onConfirm={remove}
         >
@@ -117,7 +122,7 @@ function PersonActions({
             icon={<DeleteOutlined />}
             loading={mutation.isPending}
           >
-            Sil
+            {t("Sil")}
           </Button>
         </Popconfirm>
       </Space>
@@ -126,6 +131,7 @@ function PersonActions({
 }
 
 export function WorkforceUsersPage() {
+  const t = useTranslation();
   const { canManagePeople } = useSession();
   const [messageApi, contextHolder] = message.useMessage();
   const [params, setParams] = useState<ListParams>({ page: 1, limit: 10 });
@@ -160,7 +166,7 @@ export function WorkforceUsersPage() {
     setEditingPerson(null);
   };
   const afterDelete = () => {
-    void messageApi.success("Personel başarıyla silindi");
+    void messageApi.success(t("Personel başarıyla silindi"));
     // Son sayfanın son kaydı silinirse kullanıcı boş bir sayfada kalmasın.
     const remainingTotal = Math.max(0, (data?.total ?? 0) - 1);
     setParams((current) => {
@@ -171,7 +177,7 @@ export function WorkforceUsersPage() {
 
   const columns: TableColumnsType<WorkforceUser> = [
     {
-      title: "Sicil No",
+      title: t("Sicil No"),
       dataIndex: "registrationNumber",
       key: "registrationNumber",
       render: (value: string, person: WorkforceUser) => (
@@ -179,19 +185,19 @@ export function WorkforceUsersPage() {
       ),
     },
     {
-      title: "Ad Soyad",
+      title: t("Ad Soyad"),
       key: "fullName",
       render: (_value: unknown, person: WorkforceUser) =>
         `${person.firstName} ${person.lastName}`,
     },
     {
-      title: "Telefon",
+      title: t("Telefon"),
       dataIndex: "phone",
       key: "phone",
       render: (phone: string | null) => formatPhone(phone),
     },
     {
-      title: "Ekip",
+      title: t("Ekip"),
       key: "team",
       render: (_value: unknown, person: WorkforceUser) =>
         person.team ? (
@@ -201,7 +207,7 @@ export function WorkforceUsersPage() {
         ),
     },
     {
-      title: "Durum",
+      title: t("Durum"),
       key: "status",
       render: (_value: unknown, person: WorkforceUser) =>
         canManagePeople ? (
@@ -210,19 +216,19 @@ export function WorkforceUsersPage() {
             onChanged={(checked) => {
               void messageApi.success(
                 checked
-                  ? "Personel aktif hale getirildi"
-                  : "Personel pasif hale getirildi",
+                  ? t("Personel aktif hale getirildi")
+                  : t("Personel pasif hale getirildi"),
               );
             }}
           />
         ) : (
           <Tag color={person.isActive ? "green" : "default"}>
-            {person.isActive ? "Aktif" : "Pasif"}
+            {person.isActive ? t("Aktif") : t("Pasif")}
           </Tag>
         ),
     },
     {
-      title: "İşlemler",
+      title: t("İşlemler"),
       key: "actions",
       render: (_value: unknown, person: WorkforceUser) => (
         <PersonActions
@@ -247,7 +253,7 @@ export function WorkforceUsersPage() {
     >
       {contextHolder}
       <header className="workspace-page-heading">
-        <h1 id="people-list-title">Personeller</h1>
+        <h1 id="people-list-title">{t("Personeller")}</h1>
         {canManagePeople && (
           <Button
             type="primary"
@@ -255,21 +261,21 @@ export function WorkforceUsersPage() {
             icon={<PlusOutlined aria-hidden />}
             onClick={openCreate}
           >
-            Yeni Personel
+            {t("Yeni Personel")}
           </Button>
         )}
       </header>
       <div
         className="workspace-filters directory-filters"
         role="group"
-        aria-label="Personel filtreleri"
+        aria-label={t("Personel filtreleri")}
       >
         <div className="filter-field">
-          <label htmlFor="people-list-search">Ara</label>
+          <label htmlFor="people-list-search">{t("Ara")}</label>
           <Input
             id="people-list-search"
-            aria-label="Personel ara"
-            placeholder="Ad, soyad veya sicil numarası ara..."
+            aria-label={t("Personel ara")}
+            placeholder={t("Ad, soyad veya sicil numarası ara...")}
             prefix={<SearchOutlined />}
             allowClear
             value={searchInput}
@@ -277,15 +283,15 @@ export function WorkforceUsersPage() {
           />
         </div>
         <div className="filter-field">
-          <label htmlFor="people-list-status">Durum</label>
+          <label htmlFor="people-list-status">{t("Durum")}</label>
           <Select
             id="people-list-status"
-            aria-label="Personel durumu"
+            aria-label={t("Personel durumu")}
             value={status}
             options={[
-              { value: "all", label: "Tümü" },
-              { value: "active", label: "Aktif" },
-              { value: "passive", label: "Pasif" },
+              { value: "all", label: t("Tümü") },
+              { value: "active", label: t("Aktif") },
+              { value: "passive", label: t("Pasif") },
             ]}
             onChange={(value: "all" | "active" | "passive") =>
               setParams((current) => ({
@@ -301,15 +307,15 @@ export function WorkforceUsersPage() {
         <Alert
           type="error"
           showIcon
-          title="Personel listesi yüklenemedi"
-          description="Sunucu bağlantısını kontrol edip yeniden deneyin."
+          title={t("Personel listesi yüklenemedi")}
+          description={t("Sunucu bağlantısını kontrol edip yeniden deneyin.")}
           action={
             <Button
               onClick={() => {
                 void refetch();
               }}
             >
-              Yeniden dene
+              {t("Yeniden dene")}
             </Button>
           }
         />
@@ -323,7 +329,7 @@ export function WorkforceUsersPage() {
           }
           dataSource={data?.data ?? []}
           loading={isFetching}
-          locale={{ emptyText: "Kayıt bulunamadı" }}
+          locale={{ emptyText: t("Kayıt bulunamadı") }}
           scroll={{ x: 1000 }}
           pagination={{
             current: params.page,
