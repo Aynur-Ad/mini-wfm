@@ -1,3 +1,4 @@
+import type { WorkforceImportRow } from './workforce-users-csv.js';
 import type { TimesheetDto } from './dto/timesheet.dto.js';
 import { Inject, Injectable } from '@nestjs/common';
 import { WorkforceClient } from '../common/clients/workforce-client.js';
@@ -19,6 +20,13 @@ export class WorkforceUsersService {
 
   create(dto: CreateWorkforceUserDto): Observable<WorkforceUserResponseDto> {
     return this.workforceClient.send('createWorkforceUser', dto);
+  }
+
+  importCsv(rows: WorkforceImportRow[]) {
+    return this.workforceClient.send<{ imported: number }>(
+      'importWorkforceUsers',
+      rows,
+    );
   }
 
   findAll(query: QueryWorkforceUsersDto): Observable<WorkforceUsersPageDto> {

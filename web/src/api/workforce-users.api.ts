@@ -43,3 +43,17 @@ export async function updateWorkforceUser(
 export async function deleteWorkforceUser(id: number): Promise<void> {
   await http.delete(`/workforce-users/${id}`);
 }
+export async function importWorkforceUsers(
+  file: File,
+): Promise<{ imported: number }> {
+  const form = new FormData();
+  form.append("file", file);
+  const { data } = await http.post<{ imported: number }>(
+    "/workforce-users/import",
+    form,
+    {
+      headers: { "Content-Type": undefined },
+    },
+  );
+  return data;
+}

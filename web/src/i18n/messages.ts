@@ -189,6 +189,19 @@ const english = {
   "{name} aktiflik durumu": "Active status for {name}",
   "İş emrinin durumu {status} olarak güncellenecek.":
     "The work order status will change to {status}.",
+  "CSV içe aktar": "Import CSV",
+  "CSV ile personel ekle": "Add personnel from CSV",
+  "İçe aktar": "Import",
+  Kapat: "Close",
+  "{count} personel eklendi.": "{count} personnel record(s) added.",
+  "UTF-8 · En fazla 500 personel ve 256 KB":
+    "UTF-8 · Up to 500 records and 256 KB",
+  "Dosya seç": "Choose file",
+  "Dosyayı değiştir": "Change file",
+  "Örnek CSV indir": "Download sample CSV",
+  "CSV dosyası": "CSV file",
+  "Dosya 256 KB sınırını aşıyor.": "The file exceeds the 256 KB limit.",
+  "Satır {row}": "Line {row}",
 };
 
 export type MessageKey = keyof typeof english;
