@@ -1,3 +1,4 @@
+import { WorkspaceBrand } from "./workspace-brand";
 import { useState } from "react";
 import { Button, Dropdown, Layout } from "antd";
 import {
@@ -9,7 +10,6 @@ import {
   CalendarOutlined,
   DownOutlined,
   LogoutOutlined,
-  MenuOutlined,
   ScheduleOutlined,
 } from "@ant-design/icons";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
@@ -91,8 +91,7 @@ export function AppLayout() {
           aria-expanded={expanded}
           onClick={() => (expanded ? closeMenu() : setExpanded(true))}
         >
-          <MenuOutlined />
-          {expanded && <span>{t("Ana menü")}</span>}
+          <WorkspaceBrand compact={!expanded} />
         </button>
         <Link
           className="dashboard-link"
