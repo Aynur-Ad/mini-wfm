@@ -3,7 +3,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Alert, Button, Form, Input } from "antd";
 import {
   ArrowRightOutlined,
-  BranchesOutlined,
+  TeamOutlined,
+  ThunderboltFilled,
+  CalendarOutlined,
+  CheckOutlined,
   LockOutlined,
   UserOutlined,
 } from "@ant-design/icons";
@@ -56,7 +59,7 @@ export function LoginPage() {
       setError(
         apiErrorMessage(
           failure,
-          "Giriş yapılamadı. Bağlantını kontrol edip tekrar dene.",
+          "Giriş yapılamadı. Bağlantıyı kontrol edip tekrar deneyin.",
         ),
       );
     } finally {
@@ -68,20 +71,49 @@ export function LoginPage() {
     <main className="login-screen">
       <section className="login-cover" aria-label="Mini WFM">
         <div className="brand">
-          <span className="brand-icon">
-            <BranchesOutlined />
+          <span className="brand-icon" aria-hidden="true">
+            <TeamOutlined />
+            <ThunderboltFilled className="brand-energy" />
           </span>{" "}
           Mini WFM
         </div>
         <div className="login-cover-copy">
-          <h2>Saha operasyonları</h2>
-          <p>Ekiplerini, personelini ve günlük iş akışını tek yerden yönet.</p>
+          <h2>İş gücü yönetimi</h2>
+          <p>Ekipler, personel ve iş emirleri bir arada.</p>
+        </div>
+        <div className="login-illustration" aria-hidden="true">
+          <div className="illustration-calendar">
+            <CalendarOutlined className="illustration-icon" />
+            <div className="illustration-row">
+              <span />
+              <span />
+              <span />
+              <span />
+              <span />
+            </div>
+            <div className="illustration-row">
+              <span />
+              <span />
+              <span />
+              <span />
+              <span />
+            </div>
+            <div className="illustration-row">
+              <span />
+              <span />
+              <span />
+              <span />
+              <span />
+            </div>
+          </div>
+          <div className="illustration-check">
+            <CheckOutlined />
+          </div>
         </div>
       </section>
       <section className="login-content">
         <div className="login-form">
           <h1>Giriş yap</h1>
-          <p>Mini WFM hesabınla devam et.</p>
           {error && (
             <Alert
               type="error"
@@ -102,7 +134,7 @@ export function LoginPage() {
                 {
                   required: true,
                   whitespace: true,
-                  message: "Kullanıcı adını gir.",
+                  message: "Kullanıcı adınızı girin.",
                 },
               ]}
             >
@@ -116,7 +148,7 @@ export function LoginPage() {
             <Form.Item
               name="password"
               label="Şifre"
-              rules={[{ required: true, message: "Şifreni gir." }]}
+              rules={[{ required: true, message: "Şifrenizi girin." }]}
             >
               <Input.Password
                 prefix={<LockOutlined />}

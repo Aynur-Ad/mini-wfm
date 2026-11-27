@@ -28,20 +28,32 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         locale={trTR}
         theme={{
           token: {
-            colorPrimary: "#b84d16",
+            colorPrimary: "#ba4d20",
             colorSuccess: "#287651",
-            colorLink: "#23664c",
-            colorText: "#1b3328",
+            colorLink: "#235f86",
+            colorText: "#233832",
+            colorTextSecondary: "#586b65",
+            colorBorder: "#d6e1de",
+            colorTextPlaceholder: "#697c76",
+            controlHeight: 36,
             borderRadius: 10,
             fontFamily: 'Inter, "Segoe UI", sans-serif',
           },
           components: {
             Menu: {
-              darkItemBg: "#153e30",
-              darkItemSelectedBg: "#285744",
-              darkItemSelectedColor: "#fff7ec",
+              itemBg: "transparent",
+              itemColor: "#39524b",
+              itemHoverBg: "#edf5f9",
+              itemSelectedBg: "#dcece6",
+              itemSelectedColor: "#194a39",
+              itemHeight: 46,
             },
-            Table: { headerBg: "#f3f6f0" },
+            Table: {
+              headerBg: "#edf4f8",
+              headerColor: "#324e60",
+              rowHoverBg: "#f1f7fa",
+              borderColor: "#e6eeeb",
+            },
           },
         }}
       >

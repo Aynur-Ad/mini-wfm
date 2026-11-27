@@ -203,7 +203,7 @@ function OrderDetails({ id }: { id: number }) {
           { title: order.code },
         ]}
       />
-      <div className="order-heading order-detail-heading">
+      <div className="workspace-page-heading detail-heading order-detail-heading">
         <div>
           <div className="order-code">{order.code}</div>
           <h1 id="order-title">{order.title}</h1>
@@ -232,7 +232,7 @@ function OrderDetails({ id }: { id: number }) {
       )}
       <Descriptions
         bordered
-        column={{ xs: 1, sm: 2, lg: 2 }}
+        column={1}
         items={[
           { key: "team", label: "Ekip", children: teamName(order.teamId) },
           {
@@ -243,7 +243,6 @@ function OrderDetails({ id }: { id: number }) {
           {
             key: "description",
             label: "Açıklama",
-            span: "filled",
             children: (
               <span className="order-description">
                 {order.description || "—"}

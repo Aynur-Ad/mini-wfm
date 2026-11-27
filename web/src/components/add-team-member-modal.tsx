@@ -30,11 +30,12 @@ export function AddTeamMemberModal({
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      setParams((current) => ({
-        ...current,
-        search: search.trim() || undefined,
-        page: 1,
-      }));
+      const nextSearch = search.trim() || undefined;
+      setParams((current) =>
+        current.search === nextSearch
+          ? current
+          : { ...current, search: nextSearch, page: 1 },
+      );
     }, 400);
     return () => clearTimeout(timer);
   }, [search]);
