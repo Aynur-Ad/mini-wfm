@@ -1,3 +1,5 @@
+import { useListDensity } from "../hooks/use-list-density";
+import { ListToolbar } from "../components/list-toolbar";
 import type { Translator } from "../i18n/messages";
 import { useTranslation } from "../i18n/language";
 import { useState } from "react";
@@ -5,7 +7,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Alert,
   Button,
-  Checkbox,
+  Segmented,
   Input,
   Select,
   Space,
@@ -13,7 +15,14 @@ import {
   Tag,
 } from "antd";
 import type { TableColumnsType } from "antd";
-import { PlusOutlined, SearchOutlined } from "@ant-design/icons";
+import {
+  ClockCircleOutlined,
+  ProfileOutlined,
+  SyncOutlined,
+  TeamOutlined,
+  PlusOutlined,
+  SearchOutlined,
+} from "@ant-design/icons";
 import { Link, useNavigate } from "react-router-dom";
 import { useSession } from "../auth/use-session";
 import { TEAMS_QUERY_KEY } from "../hooks/query-keys";
@@ -37,19 +46,14 @@ import type { Filters, WorkOrderListItem } from "../work-orders/work-orders";
 function getColumns(t: Translator): TableColumnsType<WorkOrderListItem> {
   return [
     {
-      title: t("Kod"),
-      key: "code",
+      title: t("İş emri"),
+      key: "order",
       render: (_, row) => (
-        <Link className="order-code" to={`/work-orders/${row.id}`}>
-          {row.code}
+        <Link className="record-identity" to={`/work-orders/${row.id}`}>
+          <strong>{row.title}</strong>
+          <small className="order-code">{row.code}</small>
         </Link>
       ),
-    },
-    {
-      title: t("Başlık"),
-      dataIndex: "title",
-      key: "title",
-      className: "order-title-cell",
     },
     {
       title: t("Öncelik"),
@@ -73,9 +77,7 @@ function getColumns(t: Translator): TableColumnsType<WorkOrderListItem> {
         <Space wrap>
           {displayDate(row.dueAt)}
           {row.isOverdue && (
-            <Tag className="order-late-tag" color="volcano">
-              {t("Gecikti")}
-            </Tag>
+            <Tag className="order-late-tag">{t("Gecikti")}</Tag>
           )}
         </Space>
       ),
@@ -84,6 +86,7 @@ function getColumns(t: Translator): TableColumnsType<WorkOrderListItem> {
 }
 
 export function WorkOrdersPage() {
+  const density = useListDensity();
   const t = useTranslation();
   const navigate = useNavigate();
   const client = useQueryClient();
@@ -102,6 +105,7 @@ export function WorkOrdersPage() {
   const create = useMutation({
     mutationFn: createWorkOrder,
     onSuccess: (created) => {
+      setCreating(false);
       void client.invalidateQueries({ queryKey: ordersKey });
       void navigate(`/work-orders/${created.id}`);
     },
@@ -118,6 +122,31 @@ export function WorkOrdersPage() {
     filters.overdue,
   );
 
+  const rows = orders.data?.data;
+  const stats = [
+    {
+      label: t("İş Emirleri"),
+      value: orders.data?.total,
+      icon: <ProfileOutlined />,
+    },
+    {
+      label: t("Aktif ekipler"),
+      value: teams.data?.filter((team) => team.isActive).length,
+      icon: <TeamOutlined />,
+    },
+    {
+      label: t("Devam ediyor"),
+      value: rows?.filter((row) => row.status === "IN_PROGRESS").length,
+      icon: <SyncOutlined />,
+    },
+    {
+      label: t("Gecikti"),
+      value: rows?.filter((row) => row.isOverdue).length,
+      icon: <ClockCircleOutlined />,
+      late: true,
+    },
+  ];
+
   return (
     <section className="workspace-list-page" aria-labelledby="orders-title">
       <header className="workspace-page-heading">
@@ -133,6 +162,22 @@ export function WorkOrdersPage() {
           </Button>
         )}
       </header>
+      <dl className="order-summary">
+        {stats.map(({ label, value, icon, late }) => (
+          <div
+            key={label}
+            className={late ? "summary-card summary-late" : "summary-card"}
+          >
+            <dt>
+              <span className="summary-icon" aria-hidden="true">
+                {icon}
+              </span>
+              {label}
+            </dt>
+            <dd>{value ?? "—"}</dd>
+          </div>
+        ))}
+      </dl>
       <div
         className="workspace-filters"
         role="group"
@@ -164,7 +209,7 @@ export function WorkOrdersPage() {
             placeholder={t("Tümü")}
             options={statusOptions(t)}
             value={filters.status ?? []}
-            onChange={(status) => updateFilters({ status })}
+            onChange={(status) => updateFilters({ status, overdue: undefined })}
           />
         </div>
         <div className="filter-field">
@@ -198,14 +243,39 @@ export function WorkOrdersPage() {
           />
         </div>
         <div className="filter-footer">
-          <Checkbox
-            checked={Boolean(filters.overdue)}
-            onChange={(event) =>
-              updateFilters({ overdue: event.target.checked })
+          <Segmented
+            aria-label={t("İş emri görünümü")}
+            value={
+              filters.overdue
+                ? "late"
+                : filters.status?.length === 1 &&
+                    filters.status[0] === "IN_PROGRESS"
+                  ? "progress"
+                  : filters.status?.length
+                    ? "custom"
+                    : "all"
             }
-          >
-            {t("Yalnızca gecikenler")}
-          </Checkbox>
+            options={[
+              { value: "all", label: t("Tümü") },
+              { value: "progress", label: t("Devam ediyor") },
+              { value: "late", label: t("Gecikenler") },
+              ...(filters.status?.length &&
+              !(
+                filters.status.length === 1 &&
+                filters.status[0] === "IN_PROGRESS"
+              )
+                ? [{ value: "custom", label: t("Seçili durumlar") }]
+                : []),
+            ]}
+            onChange={(v) => {
+              if (v !== "custom")
+                updateFilters({
+                  overdue: v === "late",
+                  status: v === "progress" ? ["IN_PROGRESS"] : undefined,
+                });
+            }}
+          />
+
           {hasFilters && (
             <Button
               onClick={() => {
@@ -239,6 +309,8 @@ export function WorkOrdersPage() {
         />
       ) : (
         <Table<WorkOrderListItem>
+          size={density.compact ? "small" : "middle"}
+          title={() => <ListToolbar total={orders.data?.total} {...density} />}
           rowKey="id"
           columns={getColumns(t)}
           dataSource={orders.data?.data}

@@ -1,3 +1,4 @@
+import { DetailListLayout } from "./components/detail-list-layout";
 import { WorkOrdersPage } from "./pages/work-orders-page";
 import { WorkOrderDetailPage } from "./pages/work-order-detail-page";
 import { LoginPage } from "./pages/login-page";
@@ -10,6 +11,10 @@ import { WorkforceUsersPage } from "./pages/workforce-users-page";
 import { WorkforceUserDetailPage } from "./pages/workforce-user-detail-page";
 import { NotFoundPage } from "./pages/not-found-page";
 
+import { DashboardPage } from "./pages/dashboard-page";
+import { ProfilePage } from "./pages/profile-page";
+import { ShiftsPage } from "./pages/shifts-page";
+
 export const router = createBrowserRouter([
   { path: "/login", element: <LoginPage /> },
   {
@@ -21,26 +26,38 @@ export const router = createBrowserRouter([
         children: [
           {
             index: true,
-            element: <Navigate to="/teams" replace />,
+            element: <Navigate to="/dashboard" replace />,
           },
+          { path: "dashboard", element: <DashboardPage /> },
+          { path: "profile", element: <ProfilePage /> },
+          { path: "shifts", element: <ShiftsPage /> },
           {
             path: "teams",
-            element: <TeamsPage />,
-          },
-          {
-            path: "teams/:id",
-            element: <TeamDetailPage />,
+            element: (
+              <DetailListLayout title="Ekip detayı">
+                <TeamsPage />
+              </DetailListLayout>
+            ),
+            children: [{ path: ":id", element: <TeamDetailPage /> }],
           },
           {
             path: "workforce-users",
-            element: <WorkforceUsersPage />,
+            element: (
+              <DetailListLayout title="Personel detayı">
+                <WorkforceUsersPage />
+              </DetailListLayout>
+            ),
+            children: [{ path: ":id", element: <WorkforceUserDetailPage /> }],
           },
           {
-            path: "workforce-users/:id",
-            element: <WorkforceUserDetailPage />,
+            path: "work-orders",
+            element: (
+              <DetailListLayout title="İş emri detayı">
+                <WorkOrdersPage />
+              </DetailListLayout>
+            ),
+            children: [{ path: ":id", element: <WorkOrderDetailPage /> }],
           },
-          { path: "work-orders", element: <WorkOrdersPage /> },
-          { path: "work-orders/:id", element: <WorkOrderDetailPage /> },
           {
             path: "*",
             element: <NotFoundPage />,

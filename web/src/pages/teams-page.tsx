@@ -1,3 +1,5 @@
+import { useListDensity } from "../hooks/use-list-density";
+import { ListToolbar } from "../components/list-toolbar";
 import { dateTimeFormat, useTranslation } from "../i18n/language";
 // web/src/pages/teams-page.tsx
 import { useSession } from "../auth/use-session";
@@ -28,6 +30,7 @@ import { useDeleteTeam, useTeams, useUpdateTeam } from "../hooks/use-teams";
 import type { Team } from "../types";
 
 export function TeamsPage() {
+  const density = useListDensity();
   const t = useTranslation();
   const { canManagePeople } = useSession();
   const [page, setPage] = useState<number>(1);
@@ -111,7 +114,12 @@ export function TeamsPage() {
       dataIndex: "name",
       key: "name",
       render: (name: string, record: Team) => (
-        <Link to={`/teams/${record.id}`}>{name}</Link>
+        <Link className="directory-name" to={`/teams/${record.id}`}>
+          <span aria-hidden="true" className="directory-initial">
+            {name.slice(0, 1)}
+          </span>
+          {name}
+        </Link>
       ),
     },
     {
@@ -196,7 +204,10 @@ export function TeamsPage() {
   ];
 
   return (
-    <section className="workspace-list-page" aria-labelledby="team-list-title">
+    <section
+      className="workspace-list-page directory-page"
+      aria-labelledby="team-list-title"
+    >
       <header className="workspace-page-heading">
         <h1 id="team-list-title">{t("Ekipler")}</h1>
         {canManagePeople && (
@@ -263,6 +274,8 @@ export function TeamsPage() {
         />
       ) : (
         <Table<Team>
+          size={density.compact ? "small" : "middle"}
+          title={() => <ListToolbar total={data?.total} {...density} />}
           rowKey="id"
           columns={
             canManagePeople

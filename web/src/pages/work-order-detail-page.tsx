@@ -199,7 +199,7 @@ function OrderDetails({ id }: { id: number }) {
   }
 
   return (
-    <section aria-labelledby="order-title">
+    <section className="order-detail" aria-labelledby="order-title">
       <Breadcrumb
         items={[
           { title: <Link to="/work-orders">{t("İş Emirleri")}</Link> },

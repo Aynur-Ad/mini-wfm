@@ -1,3 +1,5 @@
+import { useListDensity } from "../hooks/use-list-density";
+import { ListToolbar } from "../components/list-toolbar";
 import { WorkforceImportModal } from "../components/workforce-import-modal";
 import { useTranslation } from "../i18n/language";
 import { useSession } from "../auth/use-session";
@@ -133,6 +135,7 @@ function PersonActions({
 }
 
 export function WorkforceUsersPage() {
+  const density = useListDensity();
   const t = useTranslation();
   const { canManagePeople } = useSession();
   const [messageApi, contextHolder] = message.useMessage();
@@ -190,8 +193,15 @@ export function WorkforceUsersPage() {
     {
       title: t("Ad Soyad"),
       key: "fullName",
-      render: (_value: unknown, person: WorkforceUser) =>
-        `${person.firstName} ${person.lastName}`,
+      render: (_value: unknown, person: WorkforceUser) => (
+        <Link className="directory-name" to={`/workforce-users/${person.id}`}>
+          <span aria-hidden="true" className="directory-initial">
+            {person.firstName.slice(0, 1)}
+            {person.lastName.slice(0, 1)}
+          </span>
+          {person.firstName} {person.lastName}
+        </Link>
+      ),
     },
     {
       title: t("Telefon"),
@@ -251,7 +261,7 @@ export function WorkforceUsersPage() {
         : "passive";
   return (
     <section
-      className="workspace-list-page"
+      className="workspace-list-page directory-page"
       aria-labelledby="people-list-title"
     >
       {contextHolder}
@@ -334,6 +344,8 @@ export function WorkforceUsersPage() {
         />
       ) : (
         <Table<WorkforceUser>
+          size={density.compact ? "small" : "middle"}
+          title={() => <ListToolbar total={data?.total} {...density} />}
           rowKey="id"
           columns={
             canManagePeople

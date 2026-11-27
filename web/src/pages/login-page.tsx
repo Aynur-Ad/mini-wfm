@@ -5,8 +5,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Alert, Button, Form, Input } from "antd";
 import {
   ArrowRightOutlined,
-  TeamOutlined,
-  ThunderboltFilled,
   CalendarOutlined,
   CheckOutlined,
   LockOutlined,
@@ -42,7 +40,7 @@ export function LoginPage() {
     !from.startsWith("/\\") &&
     !/^\/login(?:[/?#]|$)/.test(from)
       ? from
-      : "/teams";
+      : "/dashboard";
 
   if (token) return <Navigate to={destination} replace />;
 
@@ -73,13 +71,6 @@ export function LoginPage() {
   return (
     <main className="login-screen">
       <section className="login-cover" aria-label="Mini WFM">
-        <div className="brand">
-          <span className="brand-icon" aria-hidden="true">
-            <TeamOutlined />
-            <ThunderboltFilled className="brand-energy" />
-          </span>{" "}
-          Mini WFM
-        </div>
         <div className="login-cover-copy">
           <h2>{t("İş gücü yönetimi")}</h2>
           <p>{t("Ekipler, personel ve iş emirleri bir arada.")}</p>
